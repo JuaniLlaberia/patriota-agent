@@ -1,0 +1,68 @@
+# Hermes Bot — local deployment.
+#
+# Verified against the real nousresearch/hermes-agent image:
+#   - HERMES_HOME = /opt/data  (config.yaml, skills, memory, cron, sessions live here)
+#   - runs as the `hermes` user; set host UID/GID via HERMES_UID/HERMES_GID (never --user)
+#   - the `hermes` CLI is reached by passthrough: `docker compose run hermes <subcommand>`
+#   - Hermes auto-injects AGENTS.md from the CWD → we set working_dir=/opt/data and
+#     mount our AGENTS.md there so the agent adopts the El Patriota / Hermes persona.
+#   - image is Node-based with Python 3.13 but NO pip (use ensurepip — see Dockerfile.hermes)
+#
+# Pass your host UID/GID so volume files are owned by you:
+#   export HERMES_UID=$(id -u) HERMES_GID=$(id -g)
+#
+# Services:
+#   hermes      — B1: agent runtime on the stock image (boot + Claude chat).
+#   hermes-mcp  — B2: same, but built from Dockerfile.hermes with patriota-tools
+#                 installed. Shares the hermes-data volume, so config/skills/MCP
+#                 registration persist across both. Enable with --profile b2.
+#   tools       — patriota-tools standalone for the Track A demo + tests.
+
+x-hermes-common: &hermes-common
+  stdin_open: true
+  tty: true
+  working_dir: /opt/data            # so Hermes auto-injects /opt/data/AGENTS.md
+  env_file:
+    - hermes/.env                   # ANTHROPIC_API_KEY (+ TELEGRAM_* in Phase F)
+  environment:
+    HERMES_UID: ${HERMES_UID:-1000}
+    HERMES_GID: ${HERMES_GID:-1000}
+    USE_MOCKS: "true"
+    PATRIOTA_DB_PATH: "/opt/data/patriota.db"
+  volumes:
+    - hermes-data:/opt/data         # persists config.yaml, skills, memory, cron, sessions
+    - ./hermes/AGENTS.md:/opt/data/AGENTS.md:ro     # persona (auto-injected from CWD)
+    # El Patriota skills bundle at a NEUTRAL path; copy into /opt/data/skills once
+    # (see USAGE.md B2). Do NOT bind-mount into /opt/data/skills/* (breaks sync).
+    - ./hermes/skills:/opt/patriota/skills:ro
+  command: ["chat"]
+
+services:
+  hermes:
+    <<: *hermes-common
+    image: nousresearch/hermes-agent:latest
+
+  hermes-mcp:
+    <<: *hermes-common
+    build:
+      context: .
+      dockerfile: Dockerfile.hermes
+    profiles: ["b2"]
+
+  tools:
+    build:
+      context: .
+      dockerfile: Dockerfile.tools
+    profiles: ["tools"]
+    env_file:
+      - .env
+    environment:
+      PATRIOTA_DB_PATH: "/data/patriota.db"
+    volumes:
+      - ./:/app:rw
+      - patriota-data:/data
+    working_dir: /app
+
+volumes:
+  hermes-data:
+  patriota-data:

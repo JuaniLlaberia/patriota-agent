@@ -1,0 +1,39 @@
+[project]
+name = "patriota-tools"
+version = "0.1.0"
+description = "MCP tool server for El Patriota's Hermes Agent deployment (news ingestion, editorial state, CMS publishing)."
+requires-python = ">=3.11"
+dependencies = [
+    "mcp>=1.2.0",
+    "httpx>=0.27",
+    "pydantic>=2.6",
+    "pydantic-settings>=2.2",
+    "pyyaml>=6.0",
+    "beautifulsoup4>=4.12",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+]
+
+[project.scripts]
+patriota-tools = "patriota_tools.server:main"
+patriota-install-mcp = "patriota_tools.install_mcp:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = [
+    "patriota_tools",
+    "patriota_tools.adapters",
+    "patriota_tools.scrapers",
+    "patriota_tools.storage",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

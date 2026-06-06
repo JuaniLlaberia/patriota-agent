@@ -1,0 +1,34 @@
+# Fuentes monitoreadas por Hermes para El Patriota.
+#
+# Definidas en la Fase 0 del proyecto. Acá van placeholders: reemplazar con las
+# 50 cuentas reales de X/Twitter y los 5 medios reales antes de producción.
+# (El equipo NO puede modificar esta lista sin el desarrollador — ver exclusiones
+# del MVP, §5.2 de la propuesta.)
+
+# Hasta 50 cuentas de X/Twitter. Solo el handle (sin @).
+x_accounts:
+  - handle: cuenta_ejemplo_1
+  - handle: cuenta_ejemplo_2
+  - handle: cuenta_ejemplo_3
+  - handle: cuenta_ejemplo_4
+  - handle: cuenta_ejemplo_5
+  # TODO Fase 1: completar hasta 50 cuentas reales.
+
+# 5 medios digitales. `id` debe coincidir con la clase scraper y el fixture
+# fixtures/outlets/<id>.json.
+outlets:
+  - id: medio_1
+    name: "Medio 1 (placeholder)"
+    url: "https://example-medio-1.com.ar"
+  - id: medio_2
+    name: "Medio 2 (placeholder)"
+    url: "https://example-medio-2.com.ar"
+  - id: medio_3
+    name: "Medio 3 (placeholder)"
+    url: "https://example-medio-3.com.ar"
+  - id: medio_4
+    name: "Medio 4 (placeholder)"
+    url: "https://example-medio-4.com.ar"
+  - id: medio_5
+    name: "Medio 5 (placeholder)"
+    url: "https://example-medio-5.com.ar"
