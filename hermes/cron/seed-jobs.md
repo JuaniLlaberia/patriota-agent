@@ -6,7 +6,8 @@ tick cada 60s. En desarrollo, forzar un ciclo con `hermes cron tick`.
 
 > Recordatorio: cada job corre en **sesión nueva**; el prompt + las skills deben ser
 > autosuficientes. `--workdir /app` carga `AGENTS.md` (persona + reglas).
-> Mientras no haya Telegram, usar `--deliver local` (sale a `~/.hermes/cron/output/`).
+> El gateway debe estar corriendo (`docker compose up hermes-gateway`) para que
+> `--deliver telegram` funcione.
 
 ## 1) Monitoreo continuo (ingesta → clustering → títulos)
 Cadencia inicial 45 min (configurable, estimado 30–60). Modelo más barato para el tick rutinario.

@@ -49,6 +49,21 @@ services:
       dockerfile: Dockerfile.hermes
     profiles: ["b2"]
 
+  hermes-gateway:
+    <<: *hermes-common
+    build:
+      context: .
+      dockerfile: Dockerfile.hermes
+    stdin_open: false
+    tty: false
+    command: ["gateway"]
+    restart: unless-stopped
+    environment:
+      HERMES_UID: ${HERMES_UID:-1000}
+      HERMES_GID: ${HERMES_GID:-1000}
+      USE_MOCKS: "false"
+      PATRIOTA_DB_PATH: "/opt/data/patriota.db"
+
   tools:
     build:
       context: .
