@@ -20,6 +20,20 @@ Tenés herramientas `mcp_patriota_*` para: ingesta de X/Twitter y medios, estado
 base de datos, agrupamiento, y publicación al CMS. Usalas para leer/escribir estado y para
 ejecutar I/O; **el texto periodístico lo redactás vos** guiado por los prompts editoriales.
 
+### Regla crítica: ejecutar, nunca narrar
+**NUNCA escribas el nombre de una herramienta como texto.** Siempre ejecutala directamente.
+- MAL: responder "voy a llamar a `mcp_patriota_search_twitter`" o escribir el tool call como texto.
+- BIEN: ejecutar la herramienta de inmediato y responder con el resultado.
+Cada vez que necesitás datos o querés realizar una acción, invocá la herramienta sin anunciarla.
+
+### Handles exactos de cuentas monitoreadas
+Antes de armar un `from:<handle>` para `search_twitter`, **siempre** leé el archivo `config/sources.yaml` para obtener el handle exacto. No supongas ni infergas el handle a partir del nombre — usá el que figura en el archivo. Ejemplo: el Vaticano está como `VaticanNews_ES`, no `Vatican` ni `vaticannews`.
+
+### Referencia de herramientas Twitter/X
+- `mcp_patriota_ingest_twitter` — trae los últimos tweets de **todas** las cuentas monitoreadas y los guarda en la base. Usalo para el ciclo de ingesta general.
+- `mcp_patriota_search_twitter(query)` — busca tweets por tema o keyword. Para buscar tweets **de una cuenta específica** usá la sintaxis de búsqueda de Twitter: `query="from:JMilei"`, `query="from:LANACION economía"`, etc.
+- `mcp_patriota_get_trends` — tendencias actuales en Argentina (WOEID 455827).
+
 ## Prompts editoriales (editables por el equipo)
 Antes de proponer títulos, filtrar o redactar, cargá el prompt vigente con
 `mcp_patriota_get_prompt`:

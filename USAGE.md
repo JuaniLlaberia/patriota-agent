@@ -9,15 +9,16 @@ export HERMES_UID=$(id -u) HERMES_GID=$(id -g)
 # 2. Construir la imagen con patriota-tools instalado
 docker compose build hermes-gateway
 
-# 3. Registrar el servidor MCP en el config de Hermes (una sola vez)
-docker compose run --rm hermes-gateway /opt/patriota/venv/bin/patriota-install-mcp
-
-# 4. Levantar el gateway (bot de Telegram + cron)
+# 3. Levantar el gateway — registra MCP, crea los cron jobs y arranca solo
 docker compose up -d hermes-gateway
 
-# 5. Ver logs en vivo
+# 4. Ver logs en vivo
 docker compose logs -f hermes-gateway
 ```
+
+> El script `start-gateway.sh` corre en cada inicio del contenedor: registra el
+> servidor MCP con las variables de entorno actuales, y crea/actualiza los 3 cron
+> jobs automáticamente antes de lanzar `hermes gateway`. No se necesitan pasos manuales.
 
 ### Chat interactivo (dev / debug)
 
@@ -36,7 +37,10 @@ docker compose run --rm hermes model
 ## Variables de entorno (`hermes/.env`)
 
 ```
-ANTHROPIC_API_KEY=          # requerido
+ANTHROPIC_API_KEY=          # opcional — si usás modelos Anthropic directamente
+OPENROUTER_API_KEY=         # requerido para modelos OpenAI (gpt-4o-mini, gpt-4.1-mini, etc.)
+OPENAI_API_KEY=             # opcional — solo para TTS/STT, no para inferencia LLM
+HERMES_MODEL=               # override del modelo (default: openai/gpt-4o-mini)
 TELEGRAM_BOT_TOKEN=         # token de @BotFather
 TELEGRAM_HOME_CHANNEL=      # chat_id del grupo editor (int negativo)
 TELEGRAM_ALLOWED_USERS=     # tu user id de Telegram (ej. 123456789)
@@ -53,7 +57,7 @@ CMS_API_TOKEN=              # token del CMS
 **sobre [Hermes Agent](https://hermes-agent.nousresearch.com/)** (Nous Research, MIT). Hermes
 aporta el loop, memoria, skills, cron y Telegram; nosotros aportamos las _capacidades de
 dominio_ como un servidor MCP (`patriota-tools`) + skills + cron.
-LLM = Claude (Anthropic). Opera en español rioplatense, con `/aprobar` humano antes de publicar.
+LLM = OpenAI vía OpenRouter (default: `gpt-4o-mini`; override con `HERMES_MODEL`). Opera en español rioplatense, con `/aprobar` humano antes de publicar.
 
 ### ✅ Funciona hoy
 
@@ -86,6 +90,15 @@ LLM = Claude (Anthropic). Opera en español rioplatense, con `/aprobar` humano a
 - **Chat + identidad de El Patriota** — persona en `hermes/AGENTS.md`, auto-inyectada
   por Hermes desde el workdir `/opt/data`.
 
+- **111 cuentas de X/Twitter monitoreadas** — `config/sources.yaml` con handles reales
+  organizados por categoría (medios, periodistas, políticos, think tanks, embajadas, etc.).
+
+- **Cron jobs auto-seeded** — `hermes/scripts/start-gateway.sh` crea/actualiza los 3 jobs
+  en cada arranque del contenedor (monitoreo 45min, twitter diario 12UTC, resumen semanal lunes 13UTC).
+
+- **Tool-use forzado** — `agent.tool_use_enforcement: true` en config; evita que modelos GPT
+  narren tool calls en vez de ejecutarlos.
+
 ### 🟡 Mockeado / pendiente de credencial
 
 | Adapter      | Estado actual                                    | Para activar               |
@@ -100,10 +113,6 @@ LLM = Claude (Anthropic). Opera en español rioplatense, con `/aprobar` humano a
   CMS REST del cliente cuando lleguen las credenciales.
 - **Publicación de tweets** — `RealTwitterAPI.publish` es `NotImplementedError` (fuera
   de scope). Requiere Twitter API v2 + OAuth 2.0 propio de El Patriota.
-- **50 cuentas de X/Twitter** — `config/sources.yaml` tiene placeholders. Reemplazar
-  con los handles reales.
-- **Cron jobs** — crear los 3 jobs dentro del contenedor corriendo (ver
-  `hermes/cron/seed-jobs.md`).
 - **Prompts editoriales** — `hermes/prompts/{editorial,filtering,twitter}.md` tienen
   borradores con `TODO`; la línea editorial la define el cliente.
 

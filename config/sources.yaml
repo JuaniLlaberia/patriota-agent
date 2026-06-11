@@ -1,19 +1,150 @@
 # Fuentes monitoreadas por Hermes para El Patriota.
 #
-# x_accounts: hasta 50 cuentas de X/Twitter (solo el handle, sin @).
+# x_accounts: cuentas de X/Twitter (solo el handle, sin @).
 # outlets: los 7 medios digitales a monitorear; id debe coincidir con la
 #   clase scraper en patriota_tools/scrapers/outlets.py.
-#
-# Para agregar cuentas reales, reemplazar los placeholders de x_accounts.
-# Los outlets ya están configurados con sus feeds RSS reales.
 
 x_accounts:
-  - handle: cuenta_ejemplo_1
-  - handle: cuenta_ejemplo_2
-  - handle: cuenta_ejemplo_3
-  - handle: cuenta_ejemplo_4
-  - handle: cuenta_ejemplo_5
-  # TODO: completar hasta 50 cuentas reales de X/Twitter
+  # Medios argentinos
+  - handle: LANACION
+  - handle: clarincom
+  - handle: infobae
+  - handle: todonoticias
+  - handle: laderechadiario
+  - handle: perfilcom
+  - handle: forbesar
+  - handle: AmbitoCom
+  - handle: LaNacionMas
+  - handle: cronistacom
+
+  # Periodistas establishment centro/derecha
+  - handle: PagniCarlos
+  - handle: JMoralesSola
+  - handle: jdiazfernandez
+  - handle: edufeiok
+  - handle: JonatanViale
+  - handle: LuisMajul
+  - handle: mlongobardi
+  - handle: antoniolaje
+  - handle: PabloRossi
+  - handle: CeferinoReato
+  - handle: deboraplager
+  - handle: pelado_trebucq
+
+  # Comunicadores
+  - handle: AgustinLaje
+  - handle: NicoMarquezOk
+  - handle: inakigutmaher
+  - handle: GordoDan_
+  - handle: EmmanuelDanann
+  - handle: vivianacanosaok
+  - handle: CarlosMaslaton
+  - handle: alefantino10
+
+  # Economistas
+  - handle: RCachanosky
+  - handle: CarlosARodriguez
+  - handle: domingocavallo
+  - handle: LopezMurphy_R
+  - handle: salvadordist
+  - handle: CarteraMileR
+
+  # Políticos / funcionarios argentinos
+  - handle: JMilei
+  - handle: madorni
+  - handle: VickyVillarruel
+  - handle: LuisCaputoAR
+  - handle: PatoBullrich
+  - handle: mauriciomacri
+  - handle: FerIglesias
+  - handle: lemoine_lilia
+
+  # Analistas, empresarios y cuentas oficiales
+  - handle: sberensztein
+  - handle: andresmalamud
+  - handle: psirven
+  - handle: marcos_galperin
+  - handle: CasaRosada
+  - handle: OPRArgentina
+
+  # Agencias y wires internacionales
+  - handle: Reuters
+  - handle: AP
+  - handle: AFP
+  - handle: business
+  - handle: EFEnoticias
+
+  # Prensa anglosajona de referencia
+  - handle: nytimes
+  - handle: WSJ
+  - handle: WSJopinion
+  - handle: washingtonpost
+  - handle: FT
+  - handle: TheEconomist
+  - handle: TheAtlantic
+  - handle: BBCWorld
+
+  # Medios anglosajones derecha / centro-derecha
+  - handle: FoxNews
+  - handle: nypost
+  - handle: NRO
+  - handle: TheFP
+  - handle: SpectatorUSA
+  - handle: TheDispatch
+
+  # España — medios
+  - handle: abc_es
+  - handle: elmundoes
+  - handle: larazon_es
+  - handle: okdiario
+  - handle: LibertadDigital
+  - handle: elconfidencial
+  - handle: el_pais
+
+  # Latinoamérica
+  - handle: elmercurio_cl
+  - handle: latercera
+  - handle: Reforma
+  - handle: RevistaSemana
+  - handle: eltiempo
+  - handle: JornalOGlobo
+  - handle: gazetadopovo
+
+  # Voces internacionales influyentes
+  - handle: elonmusk
+  - handle: bariweiss
+  - handle: jordanbpeterson
+  - handle: nntaleb
+  - handle: TuckerCarlson
+
+  # Think tanks y opinión policy
+  - handle: CatoInstitute
+  - handle: Heritage
+  - handle: AEI
+
+  # Trump y gobierno de EE.UU.
+  - handle: realDonaldTrump
+  - handle: POTUS
+  - handle: WhiteHouse
+  - handle: PressSec
+  - handle: VP
+  - handle: SecRubio
+  - handle: SecScottBessent
+  - handle: StateDept
+  - handle: WHCOS
+
+  # Embajadas en Argentina
+  - handle: USAmbassadorARG
+  - handle: EmbajadaEEUUarg
+  - handle: IsraelArgentina
+  - handle: UKinArgentina
+  - handle: EmbEspArgentina
+  - handle: ItalyinARG
+  - handle: FranceenArg
+  - handle: AlemaniaArg
+  - handle: BrasilemBA
+  - handle: UEenArgentina
+  - handle: VaticanNews_ES
 
 outlets:
   - id: infobae

@@ -7,7 +7,13 @@
 # Opus for drafting quality; routine monitoring cron ticks override to a cheaper
 # model per-job (see hermes/cron/seed-jobs.md). Confirm the exact model string
 # Hermes expects with `hermes config set model anthropic/<model>`.
-model: anthropic/claude-opus-4-8
+model: openai/gpt-4o-mini
+
+generation:
+  temperature: 0.1
+
+agent:
+  tool_use_enforcement: true   # force structured tool calls on GPT models (not needed for Anthropic)
 
 terminal:
   backend: local
@@ -19,7 +25,7 @@ mcp_servers:
     command: patriota-tools          # console_script from pyproject (installed in image)
     args: []
     env:
-      USE_MOCKS: "true"              # flip to "false" in Phase F
+      USE_MOCKS: "false"              # flip to "false" in Phase F
       PATRIOTA_DB_PATH: "/data/patriota.db"
       PATRIOTA_WOEID: "455827"
       # Real-service vars are read from the environment when USE_MOCKS=false:

@@ -17,5 +17,7 @@ COPY patriota_tools /opt/patriota/patriota_tools
 COPY config /opt/patriota/config
 COPY fixtures /opt/patriota/fixtures
 COPY hermes/prompts /opt/patriota/prompts
-RUN /usr/bin/python3 -m venv /opt/patriota/venv \
+COPY hermes/scripts/start-gateway.sh /opt/patriota/start-gateway.sh
+RUN chmod +x /opt/patriota/start-gateway.sh \
+    && /usr/bin/python3 -m venv /opt/patriota/venv \
     && /opt/patriota/venv/bin/pip install --no-cache-dir /opt/patriota
