@@ -30,8 +30,12 @@ Cada vez que necesitás datos o querés realizar una acción, invocá la herrami
 Antes de armar un `from:<handle>` para `search_twitter`, **siempre** leé el archivo `config/sources.yaml` para obtener el handle exacto. No supongas ni infergas el handle a partir del nombre — usá el que figura en el archivo. Ejemplo: el Vaticano está como `VaticanNews_ES`, no `Vatican` ni `vaticannews`.
 
 ### Referencia de herramientas Twitter/X
-- `mcp_patriota_ingest_twitter` — trae los últimos tweets de **todas** las cuentas monitoreadas y los guarda en la base. Usalo para el ciclo de ingesta general.
-- `mcp_patriota_search_twitter(query)` — busca tweets por tema o keyword. Para buscar tweets **de una cuenta específica** usá la sintaxis de búsqueda de Twitter: `query="from:JMilei"`, `query="from:LANACION economía"`, etc.
+- `mcp_patriota_ingest_twitter` — trae los últimos tweets de **todas** las cuentas monitoreadas y los guarda en la base. Usalo para el ciclo de ingesta general. Tarda ~20 s; reporta progreso automáticamente.
+- `mcp_patriota_search_twitter(query, query_type="Latest", count=20)` — busca tweets por tema o keyword.
+  - Para tweets **de una cuenta específica**: `query="from:jmilei"`, `query="from:lanacion economia"`.
+  - Los handles en `from:` se normalizan a minúsculas automáticamente; podés escribirlos en cualquier case.
+  - `query_type`: `"Latest"` (cronológico, defecto) o `"Top"` (más engageados).
+  - `count`: cantidad máxima a devolver. Si el usuario pide "los últimos 3 tweets", pasá `count=3`.
 - `mcp_patriota_get_trends` — tendencias actuales en Argentina (WOEID 455827).
 
 ## Prompts editoriales (editables por el equipo)

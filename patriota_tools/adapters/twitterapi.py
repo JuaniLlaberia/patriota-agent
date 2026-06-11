@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from pathlib import Path
@@ -62,6 +63,10 @@ def _tweet_to_item(t: dict[str, Any]) -> dict[str, Any]:
 
 def _api_tweet_to_item(tweet: dict[str, Any]) -> dict[str, Any]:
     """Normalize a twitterapi.io response tweet to a source_item."""
+    tweet_id = tweet.get("id") or tweet.get("tweetId") or tweet.get("tweet_id")
+    if not tweet_id:
+        logger.warning("Tweet missing id field; keys: %s", list(tweet.keys()))
+        tweet_id = "unknown"
     author = tweet.get("author") or {}
     handle = author.get("userName", "unknown")
     return {
@@ -73,9 +78,14 @@ def _api_tweet_to_item(tweet: dict[str, Any]) -> dict[str, Any]:
         "author": author.get("name") or handle,
         "section": None,
         "published_at": tweet.get("createdAt"),
-        "dedupe_key": f"tweet:{tweet['id']}",
+        "dedupe_key": f"tweet:{tweet_id}",
         "raw": tweet,
     }
+
+
+def _normalize_query(query: str) -> str:
+    """Lowercase handles in from: operators — twitterapi.io advanced_search is case-sensitive."""
+    return re.sub(r"from:(\S+)", lambda m: f"from:{m.group(1).lower()}", query)
 
 
 # ── mock ─────────────────────────────────────────────────────────────────────────
@@ -101,11 +111,11 @@ class MockTwitterAPI(TwitterAPI):
     def get_trends(self, woeid: int) -> list[str]:
         return self._load("trends.json", [])
 
-    def search(self, query: str) -> list[dict[str, Any]]:
+    def search(self, query: str, query_type: str = "Latest", count: int = 20) -> list[dict[str, Any]]:
         tweets = self._load("timeline.json", [])
         q = query.lower()
         hits = [t for t in tweets if q in t.get("text", "").lower()]
-        return [_tweet_to_item(t) for t in hits]
+        return [_tweet_to_item(t) for t in hits[:count]]
 
     def publish(self, text: str, scheduled_at: str | None = None) -> dict[str, Any]:
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
@@ -130,9 +140,12 @@ async def _fetch_accounts_concurrent(
             try:
                 r = await client.get("/twitter/user/last_tweets", params={"userName": handle})
                 r.raise_for_status()
-                return [_api_tweet_to_item(t) for t in r.json().get("tweets", [])]
+                # Response: {"data": {"tweets": [...]}, ...} — NOT {"tweets": [...]}
+                data = r.json()
+                tweets = data.get("data", {}).get("tweets") or []
+                return [_api_tweet_to_item(t) for t in tweets]
             except Exception as exc:
-                logger.warning("Failed to fetch tweets for @%s: %s", handle, exc)
+                logger.warning("Failed to fetch tweets for @%s: %s (%s)", handle, exc, type(exc).__name__)
                 return []
 
     async with httpx.AsyncClient(
@@ -177,14 +190,18 @@ class RealTwitterAPI(TwitterAPI):
             logger.warning("Failed to fetch trends (woeid=%s): %s", woeid, exc)
             return []
 
-    def search(self, query: str) -> list[dict[str, Any]]:
+    def search(self, query: str, query_type: str = "Latest", count: int = 20) -> list[dict[str, Any]]:
+        # Normalize from: operators to lowercase — API is case-sensitive for handles
+        query = _normalize_query(query)
         try:
             resp = self._client.get(
                 "/twitter/tweet/advanced_search",
-                params={"query": query, "queryType": "Top"},
+                params={"query": query, "queryType": query_type, "count": count},
             )
             resp.raise_for_status()
-            return [_api_tweet_to_item(t) for t in resp.json().get("tweets", [])]
+            # advanced_search response: {"tweets": [...], "has_next_page": ..., "next_cursor": ...}
+            # Slice to count client-side — API may ignore the count param
+            return [_api_tweet_to_item(t) for t in resp.json().get("tweets", [])[:count]]
         except Exception as exc:
             logger.warning("Twitter search failed for %r: %s", query, exc)
             return []

@@ -134,9 +134,19 @@ def get_trends() -> list[str]:
 
 
 @mcp.tool()
-def search_twitter(query: str) -> list[dict[str, Any]]:
-    """Most-interacted tweets for a topic/keyword (normalized, not yet stored)."""
-    return get_twitter(settings).search(query)
+def search_twitter(
+    query: str,
+    query_type: str = "Latest",
+    count: int = 20,
+) -> list[dict[str, Any]]:
+    """Search tweets by keyword or account.
+
+    Use ``from:handle`` to get tweets from a specific account (e.g. ``from:jmilei``).
+    query_type: 'Latest' (default, chronological) or 'Top' (most-engaged).
+    count: max results to return (default 20).
+    Handles in from: are normalised to lowercase automatically.
+    """
+    return get_twitter(settings).search(query, query_type=query_type, count=count)
 
 
 @mcp.tool()
