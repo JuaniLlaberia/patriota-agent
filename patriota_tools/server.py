@@ -9,11 +9,12 @@ Run standalone for testing:  patriota-tools   (or: python -m patriota_tools.serv
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 from typing import Any
 
 import yaml
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import Context, FastMCP
 
 from . import storage as _storage  # noqa: F401  (ensures package import)
 from .adapters.cms import get_cms
@@ -97,14 +98,33 @@ def list_prompt_versions(name: str) -> list[dict[str, Any]]:
 
 
 # ── ingestion ───────────────────────────────────────────────────────────────────
+
+_TWITTER_CHUNK = 20  # accounts per progress batch
+
+
 @mcp.tool()
-def ingest_twitter() -> dict[str, Any]:
-    """Pull latest tweets from the monitored accounts and store new (deduped) items."""
+async def ingest_twitter(ctx: Context) -> dict[str, Any]:
+    """Pull latest tweets from all monitored accounts (concurrent, reports progress).
+
+    Fetches in batches of 20 with up to 10 parallel requests per batch.
+    Emits a progress notification after each batch (~every 3 s for real API).
+    """
     accounts = [a if isinstance(a, str) else a.get("handle") for a in _load_sources().get("x_accounts", [])]
     accounts = [a for a in accounts if a]
-    items = get_twitter(settings).monitor_accounts(accounts)
-    new = sum(1 for it in items if db.upsert_source_item(settings.db_path, it))
-    return {"fetched": len(items), "new": new, "kind": "tweet"}
+    total = len(accounts)
+    tw = get_twitter(settings)
+    all_items: list[dict[str, Any]] = []
+
+    for start in range(0, total, _TWITTER_CHUNK):
+        batch = accounts[start : start + _TWITTER_CHUNK]
+        # monitor_accounts runs concurrent HTTP internally (asyncio.run + semaphore);
+        # to_thread avoids blocking the MCP event loop while it does so.
+        chunk_items = await asyncio.to_thread(tw.monitor_accounts, batch)
+        all_items.extend(chunk_items)
+        await ctx.report_progress(min(start + _TWITTER_CHUNK, total), total)
+
+    new = sum(1 for it in all_items if db.upsert_source_item(settings.db_path, it))
+    return {"fetched": len(all_items), "new": new, "kind": "tweet", "accounts": total}
 
 
 @mcp.tool()
@@ -121,7 +141,7 @@ def search_twitter(query: str) -> list[dict[str, Any]]:
 
 @mcp.tool()
 def ingest_media(outlet_id: str | None = None) -> dict[str, Any]:
-    """Scrape one outlet (by id) or all 5; store new (deduped) articles."""
+    """Scrape one outlet (by id) or all outlets; store new (deduped) articles."""
     outlet_ids = [outlet_id] if outlet_id else list(OUTLETS.keys())
     fetched = new = 0
     for oid in outlet_ids:
@@ -132,9 +152,9 @@ def ingest_media(outlet_id: str | None = None) -> dict[str, Any]:
 
 
 @mcp.tool()
-def ingest_all() -> dict[str, Any]:
+async def ingest_all(ctx: Context) -> dict[str, Any]:
     """Full monitoring tick: tweets from all accounts + articles from all outlets."""
-    tw = ingest_twitter()
+    tw = await ingest_twitter(ctx)
     md = ingest_media()
     return {"twitter": tw, "media": md, "at": _now()}
 

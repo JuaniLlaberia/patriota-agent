@@ -7,6 +7,7 @@ for the current phase and raises NotImplementedError.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from abc import ABC, abstractmethod
@@ -118,6 +119,32 @@ class MockTwitterAPI(TwitterAPI):
 
 # ── real ─────────────────────────────────────────────────────────────────────────
 
+async def _fetch_accounts_concurrent(
+    api_key: str, accounts: list[str], max_concurrent: int = 10
+) -> list[dict[str, Any]]:
+    """Fetch last tweets for a list of handles concurrently (max_concurrent at a time)."""
+    sem = asyncio.Semaphore(max_concurrent)
+
+    async def _one(client: httpx.AsyncClient, handle: str) -> list[dict[str, Any]]:
+        async with sem:
+            try:
+                r = await client.get("/twitter/user/last_tweets", params={"userName": handle})
+                r.raise_for_status()
+                return [_api_tweet_to_item(t) for t in r.json().get("tweets", [])]
+            except Exception as exc:
+                logger.warning("Failed to fetch tweets for @%s: %s", handle, exc)
+                return []
+
+    async with httpx.AsyncClient(
+        base_url=_TWITTERAPI_BASE,
+        headers={"X-API-Key": api_key},
+        timeout=15.0,
+    ) as client:
+        results = await asyncio.gather(*[_one(client, h) for h in accounts])
+
+    return [item for batch in results for item in batch]
+
+
 class RealTwitterAPI(TwitterAPI):
     """twitterapi.io client (read-only monitoring).
 
@@ -129,6 +156,7 @@ class RealTwitterAPI(TwitterAPI):
     """
 
     def __init__(self, api_key: str):
+        self._api_key = api_key
         self._client = httpx.Client(
             base_url=_TWITTERAPI_BASE,
             headers={"X-API-Key": api_key},
@@ -136,19 +164,9 @@ class RealTwitterAPI(TwitterAPI):
         )
 
     def monitor_accounts(self, accounts: list[str]) -> list[dict[str, Any]]:
-        items: list[dict[str, Any]] = []
-        for handle in accounts:
-            try:
-                resp = self._client.get(
-                    "/twitter/user/last_tweets",
-                    params={"userName": handle},
-                )
-                resp.raise_for_status()
-                for tweet in resp.json().get("tweets", []):
-                    items.append(_api_tweet_to_item(tweet))
-            except Exception as exc:
-                logger.warning("Failed to fetch tweets for @%s: %s", handle, exc)
-        return items
+        # Runs all requests concurrently (max 10 in parallel) via a fresh event loop.
+        # 111 sequential × ~1.5 s → ~17 s total with concurrency=10.
+        return asyncio.run(_fetch_accounts_concurrent(self._api_key, accounts))
 
     def get_trends(self, woeid: int) -> list[str]:
         try:
