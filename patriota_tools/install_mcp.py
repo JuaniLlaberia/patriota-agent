@@ -1,13 +1,11 @@
 """Register the patriota MCP server in Hermes' config.yaml.
 
-Workaround for this Hermes image: the `hermes mcp add` CLI crashes when run as the
-`hermes` user (missing `typer`), and running it as root would write a root-owned
-config the supervised gateway can't read. This injector writes the `mcp_servers`
-entry directly, as whatever user invokes it (run it via the wrapper so it lands as
-the `hermes` user → correct ownership).
+Workaround for a Hermes bug: the `hermes mcp add` CLI crashes when `typer` is
+missing from Hermes' own venv. This injector writes the `mcp_servers` entry
+directly into the config file.
 
-Run inside the Hermes container:
-    /opt/patriota/venv/bin/patriota-install-mcp
+Run once after installing patriota-tools, and again whenever env vars change:
+    patriota-install-mcp
 """
 
 from __future__ import annotations
@@ -19,7 +17,7 @@ import yaml
 
 
 def main() -> None:
-    home = os.environ.get("HERMES_HOME", "/opt/data")
+    home = os.environ.get("HERMES_HOME", str(Path.home() / ".hermes"))
     cfg_path = Path(os.environ.get("HERMES_CONFIG", f"{home}/config.yaml"))
 
     data = {}
@@ -47,7 +45,11 @@ def main() -> None:
         "enabled": True,
     }
 
-    data["model"] = os.environ.get("HERMES_MODEL", "openai/gpt-4o-mini")
+    model_override = os.environ.get("HERMES_MODEL")
+    if model_override:
+        data["model"] = model_override
+    else:
+        data.setdefault("model", "openai/gpt-4o-mini")
     data.setdefault("agent", {})["tool_use_enforcement"] = True
     data.setdefault("generation", {}).setdefault("temperature", 0.1)
 

@@ -1,0 +1,27 @@
+[Unit]
+Description=El Patriota — Hermes editorial gateway
+Documentation=file:/etc/patriota/env
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=patriota
+EnvironmentFile=/etc/patriota/env
+
+# start-gateway.sh registers the MCP config, seeds cron jobs on first run,
+# then exec-replaces itself with `hermes gateway` (the long-running process).
+ExecStart=/bin/sh /opt/patriota/start-gateway.sh
+
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=patriota-gateway
+
+# Prevent repeated fast crashes from hammering external APIs.
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,5 +1,8 @@
 # Hermes Agent configuration for the El Patriota deployment.
-# Lives at ~/.hermes/config.yaml (mounted from ./hermes).
+# Copied to ~/.hermes/config.yaml by deploy/install.sh.
+# The mcp_servers section below is managed at runtime by `patriota-install-mcp`
+# (run automatically by start-gateway.sh on each start); hand-edits to that
+# section will be overwritten. All other keys are preserved across restarts.
 # Prefer `hermes config set <key> <value>` over hand-editing where possible.
 
 # ── Model ──────────────────────────────────────────────────────────────────────
@@ -22,14 +25,14 @@ terminal:
 # Tools surface to the agent as mcp_patriota_<tool> (e.g. mcp_patriota_ingest_all).
 mcp_servers:
   patriota:
-    command: patriota-tools          # console_script from pyproject (installed in image)
+    # ↓ overwritten by patriota-install-mcp on every gateway start — edit /etc/patriota/env instead
+    command: /opt/patriota/venv/bin/patriota-tools
     args: []
     env:
-      USE_MOCKS: "false"              # flip to "false" in Phase F
-      PATRIOTA_DB_PATH: "/data/patriota.db"
+      USE_MOCKS: "false"
+      PATRIOTA_DB_PATH: "/home/patriota/.hermes/patriota.db"
       PATRIOTA_WOEID: "455827"
-      # Real-service vars are read from the environment when USE_MOCKS=false:
-      # TWITTERAPI_IO_KEY, CMS_BASE_URL, CMS_API_TOKEN
+      # TWITTERAPI_IO_KEY, CMS_BASE_URL, CMS_API_TOKEN injected from /etc/patriota/env
 
 # ── Cron ───────────────────────────────────────────────────────────────────────
 cron:
@@ -37,6 +40,6 @@ cron:
   script_timeout_seconds: 300
 
 # ── Persona / operating rules ──────────────────────────────────────────────────
-# Persistent persona + house rules live in hermes/AGENTS.md, loaded when the
-# agent runs with this directory as its workdir (cron jobs set --workdir /app
-# or the project dir). Keep the editorial voice and guardrails there.
+# Persistent persona + house rules live in hermes/AGENTS.md, copied to
+# ~/.hermes/AGENTS.md by deploy/install.sh. Cron jobs use --workdir ~/.hermes
+# so Hermes auto-injects it. Keep the editorial voice and guardrails there.
