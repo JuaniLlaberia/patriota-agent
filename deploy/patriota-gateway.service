@@ -15,6 +15,7 @@ ExecStart=/bin/sh /opt/patriota/start-gateway.sh
 
 Restart=on-failure
 RestartSec=10
+TimeoutStopSec=210
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=patriota-gateway
