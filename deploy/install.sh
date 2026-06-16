@@ -20,6 +20,13 @@
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# ── 0. System prerequisites ───────────────────────────────────────────────────
+install_prerequisites() {
+    info "Installing system prerequisites..."
+    apt-get install -y -q python3-venv ripgrep ffmpeg
+    check "python3-venv, ripgrep, ffmpeg installed"
+}
 INSTALL_USER="patriota"
 HERMES_HOME="/home/$INSTALL_USER/.hermes"
 VENV_DIR="/opt/patriota/venv"
@@ -157,6 +164,7 @@ install_service() {
 
 # ── main ──────────────────────────────────────────────────────────────────────
 require_root
+install_prerequisites
 create_user
 install_hermes
 install_tools
