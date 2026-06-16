@@ -139,8 +139,17 @@ TELEGRAM_ALLOWED_USERS=      # your Telegram user id (e.g. 123456789)
 
 # ── External integrations ─────────────────────────────────────────────────────
 TWITTERAPI_IO_KEY=           # twitterapi.io key for X/Twitter monitoring
-CMS_BASE_URL=                # CMS REST endpoint
-CMS_API_TOKEN=               # CMS API token
+
+# ── AI / LLM ─────────────────────────────────────────────────────────────────
+OPENAI_API_KEY=              # For embeddings (text-embedding-3-small, OpenAI direct)
+OPENROUTER_API_KEY=          # For article generation via GPT-4o-mini (OpenRouter)
+
+# ── CMS OAuth v1.1 ───────────────────────────────────────────────────────────
+CMS_API_URL_BASE=            # CMS REST base URL (e.g. https://api.elpatriota.com)
+CMS_CLIENT_ID=               # OAuth client ID
+CMS_CLIENT_SECRET=           # OAuth client secret
+CMS_USERNAME=                # CMS user with API permissions
+CMS_PASSWORD=                # CMS user password
 
 # ── Resolved by install.sh — do not edit unless you move things ──────────────
 HERMES_HOME=$HERMES_HOME

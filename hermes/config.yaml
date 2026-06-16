@@ -35,7 +35,7 @@ mcp_servers:
       USE_MOCKS: "false"
       PATRIOTA_DB_PATH: "/home/patriota/.hermes/patriota.db"
       PATRIOTA_WOEID: "455827"
-      # TWITTERAPI_IO_KEY, CMS_BASE_URL, CMS_API_TOKEN injected from /etc/patriota/env
+      # TWITTERAPI_IO_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY, CMS_* injected from /etc/patriota/env
 
 # ── Cron ───────────────────────────────────────────────────────────────────────
 cron:

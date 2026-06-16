@@ -1,0 +1,193 @@
+"""Semantic clustering for editorial source items.
+
+Two-phase hybrid approach:
+  1. Embeddings phase: text-embedding-3-small → cosine distance matrix → HDBSCAN
+  2. LLM validation: each candidate cluster reviewed by an editor LLM that
+     reorganises or discards items before they become confirmed clusters.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+from typing import Any
+
+import numpy as np
+import openai
+
+logger = logging.getLogger(__name__)
+
+_VALIDATION_PROMPT = """\
+Sos un editor de noticias argentino. Te doy un grupo de noticias y tweets que un algoritmo
+agrupó por similitud semántica. Tu tarea es reorganizarlos editorialmente.
+
+REGLAS:
+1. Si todos cubren el mismo evento o hecho noticioso concreto → devolvé un único cluster
+2. Si hay ítems de temas distintos mezclados → separarlos en clusters distintos, uno por tema
+3. Si hay ítems claramente no relacionados con ningún otro → descartarlos (DESCARTAR)
+4. Nunca agrupar ítems que traten el mismo tema general pero eventos distintos
+
+CRITERIO CLAVE: mismo evento = mismo hecho concreto ocurrido en las últimas horas.
+  ✅ mismo cluster: dos tweets y un artículo sobre el discurso de Milei de esta mañana
+  ✅ mismo cluster: tres fuentes sobre la suba del dólar de hoy
+  ❌ clusters separados: nota sobre inflación de hoy + tweet sobre el FMI (temas distintos aunque relacionados)
+  ❌ descartar: tweet sobre farándula que quedó en el cluster por error
+
+ÍTEMS DEL CLUSTER:
+{items_block}
+
+Respondé ÚNICAMENTE con JSON válido en este formato:
+{{
+  "clusters": [
+    {{
+      "ids": ["id1", "id2"],
+      "tema": "descripción breve del tema en común"
+    }}
+  ],
+  "descartar": ["id3", "id4"]
+}}"""
+
+
+class HybridClusterer:
+    """Embed → HDBSCAN → LLM validation pipeline."""
+
+    def __init__(
+        self,
+        openai_api_key: str,
+        openrouter_api_key: str,
+        llm_model: str = "openai/gpt-4o-mini",
+    ) -> None:
+        self._embed_client = openai.OpenAI(api_key=openai_api_key)
+        self._llm_client = openai.OpenAI(
+            api_key=openrouter_api_key,
+            base_url="https://openrouter.ai/api/v1",
+        )
+        self._llm_model = llm_model
+
+    # ── Phase 1: Embeddings ──────────────────────────────────────────────────
+
+    def embed_items(self, items: list[dict[str, Any]]) -> np.ndarray:
+        texts = [
+            (item.get("title") or "") + " " + (item.get("body") or "")[:300]
+            for item in items
+        ]
+        response = self._embed_client.embeddings.create(
+            model="text-embedding-3-small",
+            input=texts,
+        )
+        vectors = [e.embedding for e in sorted(response.data, key=lambda e: e.index)]
+        return np.array(vectors, dtype=np.float32)
+
+    def cluster_embeddings(self, embeddings: np.ndarray) -> np.ndarray:
+        """Return HDBSCAN cluster labels (-1 = noise)."""
+        import hdbscan  # lazy import
+
+        norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+        norms = np.where(norms == 0, 1e-10, norms)
+        normed = embeddings / norms
+        dist = np.clip(1.0 - (normed @ normed.T), 0.0, 2.0).astype(np.float64)
+
+        return hdbscan.HDBSCAN(
+            min_cluster_size=2,
+            metric="precomputed",
+            cluster_selection_method="eom",
+        ).fit_predict(dist)
+
+    # ── Phase 2: LLM validation ──────────────────────────────────────────────
+
+    def validate_cluster_with_llm(
+        self, cluster_items: list[dict[str, Any]]
+    ) -> dict[str, Any]:
+        lines = []
+        for item in cluster_items:
+            raw: dict = {}
+            try:
+                raw = json.loads(item.get("raw") or "{}")
+            except (json.JSONDecodeError, TypeError):
+                pass
+            engagement = raw.get("likeCount") or raw.get("likes") or ""
+            eng_str = f" | engagement: {engagement}" if engagement else ""
+            lines.append(
+                f"- id: {item['id']}\n"
+                f"  titulo: {item.get('title') or '(sin título)'}\n"
+                f"  fuente: {item.get('source') or ''}\n"
+                f"  url: {item.get('url') or ''}\n"
+                f"  fecha: {item.get('published_at') or item.get('ingested_at') or ''}"
+                f"{eng_str}"
+            )
+
+        prompt = _VALIDATION_PROMPT.format(items_block="\n".join(lines))
+
+        for attempt in range(2):
+            try:
+                resp = self._llm_client.chat.completions.create(
+                    model=self._llm_model,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.1,
+                    max_tokens=1000,
+                    timeout=30,
+                )
+                content = (resp.choices[0].message.content or "").strip()
+                if content.startswith("```"):
+                    content = content.split("```")[1]
+                    if content.startswith("json"):
+                        content = content[4:]
+                return json.loads(content.strip())
+            except Exception as exc:
+                if attempt == 0:
+                    logger.warning("LLM cluster validation failed (retrying): %s", exc)
+                else:
+                    logger.error("LLM cluster validation failed twice: %s", exc)
+                    return {
+                        "clusters": [
+                            {
+                                "ids": [str(i["id"]) for i in cluster_items],
+                                "tema": "cluster sin validar",
+                            }
+                        ],
+                        "descartar": [],
+                    }
+        return {"clusters": [], "descartar": []}
+
+    # ── Full pipeline ────────────────────────────────────────────────────────
+
+    def run(self, items: list[dict[str, Any]]) -> dict[str, Any]:
+        """Run the full hybrid pipeline.
+
+        Returns:
+            {
+                "validated_clusters": [{"item_ids": [int, ...], "tema": str}],
+                "noise_item_ids": [int, ...],
+            }
+        """
+        if not items:
+            return {"validated_clusters": [], "noise_item_ids": []}
+        if len(items) == 1:
+            return {"validated_clusters": [], "noise_item_ids": [items[0]["id"]]}
+
+        embeddings = self.embed_items(items)
+        labels = self.cluster_embeddings(embeddings)
+
+        by_label: dict[int, list[dict]] = {}
+        for item, label in zip(items, labels):
+            by_label.setdefault(int(label), []).append(item)
+
+        noise_ids: list[int] = [it["id"] for it in by_label.pop(-1, [])]
+        validated: list[dict[str, Any]] = []
+
+        for cluster_items in by_label.values():
+            result = self.validate_cluster_with_llm(cluster_items)
+            id_to_item = {str(it["id"]): it for it in cluster_items}
+
+            for cluster in result.get("clusters", []):
+                ids = [int(i) for i in cluster["ids"] if i in id_to_item]
+                if len(ids) >= 2:
+                    validated.append({"item_ids": ids, "tema": cluster.get("tema", "")})
+                else:
+                    noise_ids.extend(ids)
+
+            for discarded_id in result.get("descartar", []):
+                if discarded_id in id_to_item:
+                    noise_ids.append(int(discarded_id))
+
+        return {"validated_clusters": validated, "noise_item_ids": noise_ids}

@@ -102,8 +102,12 @@ su -l patriota -c "hermes chat"
 | `TELEGRAM_HOME_CHANNEL` | Sí | chat_id del grupo editorial (int negativo) |
 | `TELEGRAM_ALLOWED_USERS` | Sí | Tu user id de Telegram (ej. `123456789`) |
 | `TWITTERAPI_IO_KEY` | Para Twitter real | API key de twitterapi.io |
-| `CMS_BASE_URL` | Para publicar | Endpoint REST del CMS |
-| `CMS_API_TOKEN` | Para publicar | Token del CMS |
+| `OPENAI_API_KEY` | Para embeddings | OpenAI directo — text-embedding-3-small |
+| `CMS_API_URL_BASE` | Para publicar | URL base del CMS (ej. `https://api.elpatriota.com`) |
+| `CMS_CLIENT_ID` | Para publicar | OAuth client ID del CMS |
+| `CMS_CLIENT_SECRET` | Para publicar | OAuth client secret del CMS |
+| `CMS_USERNAME` | Para publicar | Usuario CMS con permisos de API |
+| `CMS_PASSWORD` | Para publicar | Contraseña del usuario CMS |
 
 Las variables de rutas (`HERMES_HOME`, `PATRIOTA_MCP_COMMAND`, etc.) las escribe
 `deploy/install.sh` automáticamente — no las edites salvo que muevas la instalación.

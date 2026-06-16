@@ -32,7 +32,16 @@ def main() -> None:
             "PATRIOTA_PROMPTS_DIR", "/opt/patriota/prompts"
         ),
     }
-    for optional in ("TWITTERAPI_IO_KEY", "CMS_BASE_URL", "CMS_API_TOKEN"):
+    for optional in (
+        "TWITTERAPI_IO_KEY",
+        "OPENAI_API_KEY",
+        "OPENROUTER_API_KEY",
+        "CMS_API_URL_BASE",
+        "CMS_CLIENT_ID",
+        "CMS_CLIENT_SECRET",
+        "CMS_USERNAME",
+        "CMS_PASSWORD",
+    ):
         val = os.environ.get(optional)
         if val:
             mcp_env[optional] = val

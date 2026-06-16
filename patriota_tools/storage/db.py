@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS source_items (
     published_at  TEXT,
     dedupe_key    TEXT UNIQUE NOT NULL,
     raw           TEXT,                                -- json
-    status        TEXT NOT NULL DEFAULT 'new',         -- 'new' | 'clustered'
+    status        TEXT NOT NULL DEFAULT 'new',         -- 'new' | 'clustered' | 'solo'
     ingested_at   TEXT NOT NULL
 );
 
@@ -54,6 +54,8 @@ CREATE TABLE IF NOT EXISTS articles (
     cluster_id         INTEGER,
     title              TEXT NOT NULL,
     summary            TEXT,
+    bajada             TEXT,
+    volanta            TEXT,
     body               TEXT,
     status             TEXT NOT NULL DEFAULT 'title_proposed',
                        -- title_proposed | summary_approved | published | rejected
@@ -104,9 +106,20 @@ def get_conn(db_path: str) -> sqlite3.Connection:
     return conn
 
 
+_MIGRATIONS = [
+    "ALTER TABLE articles ADD COLUMN bajada TEXT",
+    "ALTER TABLE articles ADD COLUMN volanta TEXT",
+]
+
+
 def init_db(db_path: str) -> None:
     with get_conn(db_path) as conn:
         conn.executescript(SCHEMA)
+        for migration in _MIGRATIONS:
+            try:
+                conn.execute(migration)
+            except sqlite3.OperationalError:
+                pass  # column already exists
 
 
 def _rows(cur: sqlite3.Cursor) -> list[dict[str, Any]]:
@@ -147,6 +160,27 @@ def list_source_items(
     q += " ORDER BY ingested_at DESC LIMIT ?"; params.append(limit)
     with get_conn(db_path) as conn:
         return _rows(conn.execute(q, params))
+
+
+def list_unprocessed_items(db_path: str, limit: int = 200) -> list[dict[str, Any]]:
+    """Items eligible for clustering: status 'new' or 'solo' (leftover from prior cycles)."""
+    with get_conn(db_path) as conn:
+        return _rows(conn.execute(
+            "SELECT * FROM source_items WHERE status IN ('new', 'solo') ORDER BY ingested_at DESC LIMIT ?",
+            (limit,),
+        ))
+
+
+def mark_items_solo(db_path: str, item_ids: list[int]) -> None:
+    """Mark noise items (no cluster found) as 'solo' so they re-enter the next cycle."""
+    if not item_ids:
+        return
+    placeholders = ",".join("?" * len(item_ids))
+    with get_conn(db_path) as conn:
+        conn.execute(
+            f"UPDATE source_items SET status = 'solo' WHERE id IN ({placeholders})",
+            item_ids,
+        )
 
 
 # ── clusters ────────────────────────────────────────────────────────────────────
@@ -210,7 +244,7 @@ def create_article(db_path: str, title: str, cluster_id: int | None = None) -> i
         return int(cur.lastrowid)
 
 
-_ARTICLE_FIELDS = {"title", "summary", "body", "status", "cms_id", "prompt_version_id"}
+_ARTICLE_FIELDS = {"title", "summary", "bajada", "volanta", "body", "status", "cms_id", "prompt_version_id"}
 
 
 def update_article(db_path: str, article_id: int, **fields: Any) -> None:

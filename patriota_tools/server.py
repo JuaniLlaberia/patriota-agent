@@ -19,7 +19,9 @@ from mcp.server.fastmcp import Context, FastMCP
 from . import storage as _storage  # noqa: F401  (ensures package import)
 from .adapters.cms import get_cms
 from .adapters.twitterapi import get_twitter
+from .clustering import HybridClusterer
 from .config import load_settings
+from .generation import ArticleGenerator
 from .scrapers import OUTLETS, scrape_outlet
 from .storage import db
 
@@ -29,7 +31,7 @@ db.init_db(settings.db_path)
 
 def _seed_prompts() -> None:
     """Seed the 3 editable prompts from hermes/prompts/*.md if none exist yet."""
-    for name in ("editorial", "filtering", "twitter"):
+    for name in ("editorial", "filtering", "twitter", "recheck"):
         if db.get_latest_prompt(settings.db_path, name):
             continue
         path = settings.prompts / f"{name}.md"
@@ -205,6 +207,47 @@ def set_cluster_status(cluster_id: int, status: str) -> dict[str, Any]:
     return {"ok": True, "cluster_id": cluster_id, "status": status}
 
 
+# ── semantic clustering ──────────────────────────────────────────────────────────
+@mcp.tool()
+def cluster_items_semantically(item_ids: list[int] | None = None) -> dict[str, Any]:
+    """Group unprocessed items using embeddings (text-embedding-3-small) + HDBSCAN +
+    LLM validation. If item_ids is None, processes all items with status 'new' or 'solo'.
+    Creates validated clusters in the DB; marks noise items as 'solo' for the next cycle.
+    Requires OPENAI_API_KEY and OPENROUTER_API_KEY in the environment.
+    """
+    if not settings.openai_api_key:
+        return {"error": "OPENAI_API_KEY no configurado"}
+    if not settings.openrouter_api_key:
+        return {"error": "OPENROUTER_API_KEY no configurado"}
+
+    if item_ids is not None:
+        items = [
+            it for it in db.list_unprocessed_items(settings.db_path, limit=500)
+            if it["id"] in set(item_ids)
+        ]
+    else:
+        items = db.list_unprocessed_items(settings.db_path)
+
+    if not items:
+        return {"clusters_created": 0, "noise_items": 0, "cluster_ids": [], "note": "sin ítems nuevos"}
+
+    clusterer = HybridClusterer(settings.openai_api_key, settings.openrouter_api_key)
+    result = clusterer.run(items)
+
+    cluster_ids: list[int] = []
+    for cluster in result["validated_clusters"]:
+        cid = db.create_cluster(settings.db_path, cluster["tema"], cluster["item_ids"])
+        cluster_ids.append(cid)
+
+    db.mark_items_solo(settings.db_path, result["noise_item_ids"])
+
+    return {
+        "clusters_created": len(cluster_ids),
+        "noise_items": len(result["noise_item_ids"]),
+        "cluster_ids": cluster_ids,
+    }
+
+
 # ── article pipeline ─────────────────────────────────────────────────────────────
 @mcp.tool()
 def create_article(title: str, cluster_id: int | None = None) -> dict[str, Any]:
@@ -241,39 +284,76 @@ def list_articles(status: str | None = None) -> list[dict[str, Any]]:
 
 
 @mcp.tool()
-def publish_article_to_cms(article_id: int) -> dict[str, Any]:
-    """Publish an approved article to the CMS as 'borrador' with trazabilidad.
+def generate_article_draft(article_id: int) -> dict[str, Any]:
+    """Generate the full article draft for an article in 'summary_approved' state.
 
-    Only call after the editor has approved the full draft. Builds the payload with
-    source URLs, timestamp and the editorial prompt version, posts to the CMS, and
-    marks the article 'published'.
+    Runs the two-prompt pipeline (generation → recheck) using the approved title and
+    cluster sources. Updates the article record with titulo, bajada, volanta, body (HTML).
+    Requires OPENROUTER_API_KEY.
+    """
+    if not settings.openrouter_api_key:
+        return {"error": "OPENROUTER_API_KEY no configurado"}
+
+    article = db.get_article(settings.db_path, article_id)
+    if not article:
+        return {"error": f"artículo {article_id} no existe"}
+    if article.get("status") != "summary_approved":
+        return {"error": f"el artículo debe estar en summary_approved (estado actual: {article.get('status')})"}
+
+    cluster = db.get_cluster(settings.db_path, article["cluster_id"]) if article.get("cluster_id") else None
+    items = (cluster or {}).get("items", [])
+    if not items:
+        return {"error": "el cluster asociado no tiene fuentes"}
+
+    editorial_prompt_row = db.get_latest_prompt(settings.db_path, "editorial")
+    recheck_prompt_row = db.get_latest_prompt(settings.db_path, "recheck")
+    editorial_prompt = (editorial_prompt_row or {}).get("content", "")
+    recheck_prompt = (recheck_prompt_row or {}).get("content", "Rechequear y humanizar el siguiente borrador.")
+
+    # Pass the approved title as a hard constraint for the LLM.
+    full_prompt = f"TÍTULO APROBADO (usalo exactamente): {article['title']}\n\n{editorial_prompt}"
+
+    generator = ArticleGenerator(settings.openrouter_api_key)
+    generated = generator.generate(items, full_prompt, recheck_prompt)
+
+    db.update_article(
+        settings.db_path, article_id,
+        title=generated["titulo"] or article["title"],
+        bajada=generated["bajada"],
+        volanta=generated["volanta"],
+        body=generated["texto_html"],
+    )
+    return {"ok": True, "article_id": article_id, "generated": generated}
+
+
+@mcp.tool()
+def publish_article_to_cms(article_id: int) -> dict[str, Any]:
+    """Publish an approved article to the CMS as 'borrador' (visible=0).
+
+    Only call after the editor has approved the full draft. Posts to the CMS using
+    the v1.1 API (OAuth + multipart/form-data) and marks the article 'published'.
     """
     article = db.get_article(settings.db_path, article_id)
     if not article:
         return {"error": f"artículo {article_id} no existe"}
     if not article.get("body"):
-        return {"error": "el artículo no tiene cuerpo redactado todavía"}
+        return {"error": "el artículo no tiene cuerpo redactado — ejecutá generate_article_draft primero"}
 
-    fuentes: list[str] = []
-    if article.get("cluster_id"):
-        cluster = db.get_cluster(settings.db_path, article["cluster_id"])
-        if cluster:
-            fuentes = [it.get("url") for it in cluster["items"] if it.get("url")]
+    cluster = db.get_cluster(settings.db_path, article["cluster_id"]) if article.get("cluster_id") else None
+    cluster_topic = (cluster or {}).get("topic", "")
 
     prompt = db.get_latest_prompt(settings.db_path, "editorial")
     prompt_version_id = prompt["id"] if prompt else None
 
     payload = {
+        "fecha": _now().replace("T", " ")[:19],
         "titulo": article["title"],
-        "bajada": article.get("summary") or "",
-        "cuerpo": article["body"],
-        "tags": [],
-        "estado": "borrador",
-        "trazabilidad": {
-            "fuentes": fuentes,
-            "timestamp": _now(),
-            "prompt_version": prompt_version_id,
-        },
+        "bajada": article.get("bajada") or article.get("summary") or "",
+        "texto": article.get("body") or "",
+        "autor": "El Patriota",
+        "volanta": article.get("volanta") or "",
+        "grupo": str(article.get("cluster_id") or ""),
+        "grupo_tema": cluster_topic,
     }
     result = get_cms(settings).publish_draft(payload)
     db.update_article(

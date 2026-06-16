@@ -50,8 +50,18 @@ class Settings(BaseSettings):
 
     # External services (ignored while use_mocks is true).
     twitterapi_io_key: str | None = Field(default=None, alias="TWITTERAPI_IO_KEY")
-    cms_base_url: str | None = Field(default=None, alias="CMS_BASE_URL")
-    cms_api_token: str | None = Field(default=None, alias="CMS_API_TOKEN")
+
+    # OpenAI — embeddings (text-embedding-3-small, direct API — OpenRouter doesn't support embeddings).
+    openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
+    # OpenRouter — article generation via GPT-4o-mini.
+    openrouter_api_key: str | None = Field(default=None, alias="OPENROUTER_API_KEY")
+
+    # CMS OAuth v1.1
+    cms_api_url_base: str | None = Field(default=None, alias="CMS_API_URL_BASE")
+    cms_client_id: str | None = Field(default=None, alias="CMS_CLIENT_ID")
+    cms_client_secret: str | None = Field(default=None, alias="CMS_CLIENT_SECRET")
+    cms_username: str | None = Field(default=None, alias="CMS_USERNAME")
+    cms_password: str | None = Field(default=None, alias="CMS_PASSWORD")
 
     # Asset locations (auto-resolved; override via env if needed).
     fixtures_dir: str | None = Field(default=None, alias="PATRIOTA_FIXTURES_DIR")
