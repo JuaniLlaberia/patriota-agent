@@ -1,53 +1,112 @@
-## Comandos principales
+## Despliegue en VPS (producción)
 
-### Primera vez (setup completo)
+### Requisitos
+
+- Ubuntu 22.04+ / Debian 12+ con acceso root
+- Python 3.11+
+- curl (para el instalador de Hermes)
+
+### Primera vez
 
 ```bash
-# 1. Exportar UID/GID para que los archivos del volumen sean tuyos
-export HERMES_UID=$(id -u) HERMES_GID=$(id -g)
+# 1. Clonar el repo
+git clone <repo-url> /opt/patriota-agent
+cd /opt/patriota-agent
 
-# 2. Construir la imagen con patriota-tools instalado
-docker compose build hermes-gateway
+# 2. Correr el instalador (como root)
+sudo bash deploy/install.sh
 
-# 3. Levantar el gateway — registra MCP, crea los cron jobs y arranca solo
-docker compose up -d hermes-gateway
+# 3. Completar las credenciales
+sudo nano /etc/patriota/env
 
-# 4. Ver logs en vivo
-docker compose logs -f hermes-gateway
+# 4. Arrancar el servicio
+sudo systemctl start patriota-gateway
+
+# 5. Ver logs en vivo
+sudo journalctl -u patriota-gateway -f
 ```
 
-> El script `start-gateway.sh` corre en cada inicio del contenedor: registra el
-> servidor MCP con las variables de entorno actuales, y crea/actualiza los 3 cron
-> jobs automáticamente antes de lanzar `hermes gateway`. No se necesitan pasos manuales.
+El instalador:
+- Crea el usuario de sistema `patriota`
+- Instala el CLI de Hermes para ese usuario
+- Instala `patriota-tools` en un venv en `/opt/patriota/venv`
+- Copia config, persona (`AGENTS.md`), skills y prompts a `~/.hermes/`
+- Escribe la plantilla de secretos en `/etc/patriota/env`
+- Instala y habilita el servicio systemd `patriota-gateway`
 
-### Chat interactivo (dev / debug)
+El script `start-gateway.sh` (corrido por systemd al iniciar el servicio):
+1. Registra/actualiza la config del servidor MCP en `~/.hermes/config.yaml`
+2. Siembra los 3 cron jobs **solo la primera vez** (usa un centinela en `~/.hermes/.cron-seeded`)
+3. Lanza `hermes gateway` como proceso principal
+
+### Actualizar después de un cambio de código
 
 ```bash
-docker compose run --rm --profile b2 hermes-mcp chat
+cd /opt/patriota-agent
+git pull
+sudo bash deploy/install.sh        # reinstala herramientas y assets
+sudo systemctl restart patriota-gateway
 ```
 
-### Modelo
+### Gestión del servicio
 
 ```bash
-docker compose run --rm hermes model
+sudo systemctl status patriota-gateway
+sudo systemctl stop patriota-gateway
+sudo systemctl restart patriota-gateway
+sudo journalctl -u patriota-gateway -f        # logs en vivo
+sudo journalctl -u patriota-gateway --since "1 hour ago"
+```
+
+### Re-sembrar los cron jobs
+
+Los cron jobs se crean una sola vez. Si cambiás las definiciones (schedules, prompts,
+skills) y querés que se apliquen, borrá el centinela y reiniciá:
+
+```bash
+sudo rm /home/patriota/.hermes/.cron-seeded
+sudo systemctl restart patriota-gateway
+```
+
+> Nota: esto no toca los jobs dinámicos (tweets programados) — solo los 3 jobs base.
+> Para gestionar jobs individualmente: `su -l patriota -c "hermes cron list"`
+
+### Cambiar el modelo LLM
+
+Editá `HERMES_MODEL` en `/etc/patriota/env` y reiniciá el servicio. El valor en el
+env siempre tiene precedencia. Si `HERMES_MODEL` no está seteado, se preserva el
+modelo que tenga `~/.hermes/config.yaml` en ese momento.
+
+```bash
+# Ejemplo: cambiar a Claude Sonnet
+echo "HERMES_MODEL=anthropic/claude-sonnet-4-6" | sudo tee -a /etc/patriota/env
+sudo systemctl restart patriota-gateway
+```
+
+### Chat interactivo (debug desde el VPS)
+
+```bash
+su -l patriota -c "hermes chat"
 ```
 
 ---
 
-## Variables de entorno (`hermes/.env`)
+## Variables de entorno (`/etc/patriota/env`)
 
-```
-ANTHROPIC_API_KEY=          # opcional — si usás modelos Anthropic directamente
-OPENROUTER_API_KEY=         # requerido para modelos OpenAI (gpt-4o-mini, gpt-4.1-mini, etc.)
-OPENAI_API_KEY=             # opcional — solo para TTS/STT, no para inferencia LLM
-HERMES_MODEL=               # override del modelo (default: openai/gpt-4o-mini)
-TELEGRAM_BOT_TOKEN=         # token de @BotFather
-TELEGRAM_HOME_CHANNEL=      # chat_id del grupo editor (int negativo)
-TELEGRAM_ALLOWED_USERS=     # tu user id de Telegram (ej. 123456789)
-TWITTERAPI_IO_KEY=          # twitterapi.io — monitoring de X/Twitter
-CMS_BASE_URL=               # endpoint del CMS REST
-CMS_API_TOKEN=              # token del CMS
-```
+| Variable | Requerida | Descripción |
+|----------|-----------|-------------|
+| `OPENROUTER_API_KEY` | Sí (para GPT) | Acceso a modelos OpenAI vía OpenRouter |
+| `ANTHROPIC_API_KEY` | Si usás Claude | API key de Anthropic |
+| `HERMES_MODEL` | No | Override de modelo (default: `openai/gpt-4o-mini`) |
+| `TELEGRAM_BOT_TOKEN` | Sí | Token del bot de @BotFather |
+| `TELEGRAM_HOME_CHANNEL` | Sí | chat_id del grupo editorial (int negativo) |
+| `TELEGRAM_ALLOWED_USERS` | Sí | Tu user id de Telegram (ej. `123456789`) |
+| `TWITTERAPI_IO_KEY` | Para Twitter real | API key de twitterapi.io |
+| `CMS_BASE_URL` | Para publicar | Endpoint REST del CMS |
+| `CMS_API_TOKEN` | Para publicar | Token del CMS |
+
+Las variables de rutas (`HERMES_HOME`, `PATRIOTA_MCP_COMMAND`, etc.) las escribe
+`deploy/install.sh` automáticamente — no las edites salvo que muevas la instalación.
 
 ---
 
@@ -61,8 +120,8 @@ LLM = OpenAI vía OpenRouter (default: `gpt-4o-mini`; override con `HERMES_MODEL
 
 ### ✅ Funciona hoy
 
-- **Gateway de Telegram bidireccional** — `hermes-gateway` corre `hermes gateway` como
-  daemon con `restart: unless-stopped`. Los editores interactúan directamente en el grupo.
+- **Gateway de Telegram bidireccional** — `patriota-gateway` corre `hermes gateway` como
+  daemon con `Restart=on-failure`. Los editores interactúan directamente en el grupo.
   Bot: `@AgentePatriotaBot`. Autorización por `TELEGRAM_ALLOWED_USERS`.
 
 - **Servidor MCP `patriota-tools`** — ~25 tools (`mcp_patriota_*`) sobre SQLite. Cubre
@@ -84,17 +143,18 @@ LLM = OpenAI vía OpenRouter (default: `gpt-4o-mini`; override con `HERMES_MODEL
 
 - **Monitoreo de Twitter/X** — `RealTwitterAPI` contra `api.twitterapi.io` (auth:
   `X-API-Key`). Implementado: `monitor_accounts`, `get_trends` (WOEID 455827),
-  `search`. Requiere `TWITTERAPI_IO_KEY` en `hermes/.env`; sin la key cae al mock
+  `search`. Requiere `TWITTERAPI_IO_KEY` en `/etc/patriota/env`; sin la key cae al mock
   automáticamente.
 
-- **Chat + identidad de El Patriota** — persona en `hermes/AGENTS.md`, auto-inyectada
-  por Hermes desde el workdir `/opt/data`.
+- **Chat + identidad de El Patriota** — persona en `hermes/AGENTS.md`, copiada a
+  `~/.hermes/AGENTS.md` por el instalador y auto-inyectada por Hermes desde el workdir.
 
 - **111 cuentas de X/Twitter monitoreadas** — `config/sources.yaml` con handles reales
   organizados por categoría (medios, periodistas, políticos, think tanks, embajadas, etc.).
 
-- **Cron jobs auto-seeded** — `hermes/scripts/start-gateway.sh` crea/actualiza los 3 jobs
-  en cada arranque del contenedor (monitoreo 45min, twitter diario 12UTC, resumen semanal lunes 13UTC).
+- **Cron jobs auto-seeded en primera ejecución** — `start-gateway.sh` crea los 3 jobs
+  base solo si el centinela `~/.hermes/.cron-seeded` no existe:
+  monitoreo 45min, twitter diario 12UTC, resumen semanal lunes 13UTC.
 
 - **Tool-use forzado** — `agent.tool_use_enforcement: true` en config; evita que modelos GPT
   narren tool calls en vez de ejecutarlos.
@@ -103,9 +163,9 @@ LLM = OpenAI vía OpenRouter (default: `gpt-4o-mini`; override con `HERMES_MODEL
 
 | Adapter      | Estado actual                                    | Para activar               |
 |--------------|--------------------------------------------------|----------------------------|
-| `TwitterAPI` | Mock si falta `TWITTERAPI_IO_KEY`                | Agregar key a `hermes/.env` |
+| `TwitterAPI` | Mock si falta `TWITTERAPI_IO_KEY`                | Agregar key a `/etc/patriota/env` |
 | `CMS`        | `MockCMS` → escribe `cms_mock.jsonl`             | Implementar `RealCMS` con endpoint + token del cliente |
-| Scrapers     | `USE_MOCKS=false` en `hermes-gateway` (real RSS) | Ya activo                  |
+| Scrapers     | `USE_MOCKS=false` en env (real RSS)              | Ya activo                  |
 
 ### ⛔ Pendiente
 
@@ -120,8 +180,7 @@ LLM = OpenAI vía OpenRouter (default: `gpt-4o-mini`; override con `HERMES_MODEL
 
 - `patriota_tools/` — servidor MCP: `server.py` (tools), `storage/db.py` (SQLite),
   `adapters/` (twitterapi, cms), `scrapers/` (base + 7 outlets RSS), `config.py`.
-- `hermes/` — `AGENTS.md` (persona), `config.yaml`, `skills/` (editorial-flow,
+- `hermes/` — `AGENTS.md` (persona), `config.yaml` (plantilla), `skills/` (editorial-flow,
   twitter-flow, weekly-summary, skill-builder), `prompts/`, `cron/seed-jobs.md`.
 - `fixtures/` — datos mock para los 7 medios + Twitter. `config/sources.yaml` — fuentes.
-- `docker-compose.yml` — `hermes` (chat B1), `hermes-mcp` (chat B2, perfil `b2`),
-  `hermes-gateway` (bot Telegram + cron, always-on), `tools` (MCP standalone).
+- `deploy/` — `install.sh` (instalador VPS), `patriota-gateway.service` (systemd).
