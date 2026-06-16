@@ -76,11 +76,15 @@ install_hermes() {
 # ── 3. Python venv + patriota-tools ──────────────────────────────────────────
 install_tools() {
     info "Installing patriota-tools into $VENV_DIR..."
+    if [ -x "$VENV_DIR/bin/patriota-tools" ]; then
+        check "patriota-tools already installed (skipping)"
+        return
+    fi
     python3 -m venv "$VENV_DIR"
     "$VENV_DIR/bin/pip" install --quiet --upgrade pip
     "$VENV_DIR/bin/pip" install --quiet "$REPO_DIR"
     chown -R root:root "$VENV_DIR"   # root-owned, world-readable
-    check "patriota-tools installed ($("$VENV_DIR/bin/patriota-tools" --version 2>/dev/null || echo 'ok'))"
+    check "patriota-tools installed"
 }
 
 # ── 4. Static assets (prompts, sources, skills, persona) ─────────────────────
