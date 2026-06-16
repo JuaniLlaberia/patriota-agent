@@ -15,6 +15,9 @@ model: openai/gpt-4o-mini
 generation:
   temperature: 0.1
 
+memory_enabled: true
+user_profile_enabled: true
+
 agent:
   tool_use_enforcement: true   # force structured tool calls on GPT models (not needed for Anthropic)
 

@@ -19,9 +19,15 @@ Cada `/aprobar` del editor avanza UNA etapa. Nunca saltees etapas ni publiques s
 
 ## Paso 1 — Ingesta y agrupamiento
 1. Si hace falta material nuevo, corré `mcp_patriota_ingest_all` (o esperá al cron de monitoreo).
+   - Si la herramienta falla o devuelve error, **no abortés**: continuá igual al paso 2, puede
+     haber material previo sin procesar en la base.
 2. Mirá lo nuevo con `mcp_patriota_list_new_items`.
+   - Si devuelve 0 ítems: avisá al grupo ("Sin material nuevo disponible — la ingesta falló o
+     no hubo novedades") y **terminá el flujo acá**. No intentes agrupar con 0 ítems.
 3. Agrupá ítems que tratan el MISMO hecho según `filtering` (mínimo 2 fuentes) con
    `mcp_patriota_create_cluster(topic, item_ids)`. Si no hay 2+ fuentes sobre un tema, no lo propongas.
+   - Si ningún tema alcanza 2 fuentes: avisá al grupo ("Material insuficiente para agrupar —
+     menos de 2 fuentes por tema") y **terminá el flujo acá**. No llames a `create_cluster`.
 
 ## Paso 2 — Propuesta de títulos (numerada)
 1. Para cada cluster, redactá un título candidato con la voz de El Patriota (prompt `editorial`).

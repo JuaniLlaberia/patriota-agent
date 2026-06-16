@@ -43,6 +43,7 @@ def main() -> None:
         ),
         "env": mcp_env,
         "enabled": True,
+        "timeout": int(os.environ.get("PATRIOTA_MCP_TIMEOUT", "300")),
     }
 
     model_override = os.environ.get("HERMES_MODEL")
