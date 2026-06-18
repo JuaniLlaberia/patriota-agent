@@ -3,6 +3,9 @@ Description=El Patriota — Hermes editorial gateway
 Documentation=file:/etc/patriota/env
 After=network-online.target
 Wants=network-online.target
+# Prevent repeated fast crashes from hammering external APIs.
+StartLimitIntervalSec=120
+StartLimitBurst=5
 
 [Service]
 Type=simple
@@ -19,10 +22,6 @@ TimeoutStopSec=210
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=patriota-gateway
-
-# Prevent repeated fast crashes from hammering external APIs.
-StartLimitIntervalSec=120
-StartLimitBurst=5
 
 [Install]
 WantedBy=multi-user.target
