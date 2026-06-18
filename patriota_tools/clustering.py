@@ -30,21 +30,23 @@ REGLAS ESTRICTAS:
 5. El campo "tema" DEBE describir el evento específico (actores + acción + contexto), NUNCA la categoría.
 
 DIFERENCIA CLAVE — evento vs categoría:
-  ✅ VÁLIDO — mismo evento: tweet + artículo + nota todos sobre el mismo discurso de Milei ante el FMI
+  ✅ VÁLIDO — mismo evento: varias fuentes sobre el mismo voto en el Congreso de hoy
   ✅ VÁLIDO — mismo evento: tres fuentes sobre la misma suba del dólar de hoy
+  ✅ VÁLIDO — mismo evento: tweets y notas sobre el mismo partido de la selección argentina
   ❌ BOLSA DE CATEGORÍA (dividir): artículo sobre inflación + tweet sobre el FMI + nota sobre el dólar
   ❌ BOLSA DE CATEGORÍA (dividir): cinco ítems sobre "política argentina" de eventos distintos
   ❌ DESCARTAR: ítem de farándula o irrelevante que quedó mezclado
 
-6. Si el cluster trata sobre un hecho extranjero SIN conexión con Argentina (no involucra actores argentinos, no afecta la economía/política/sociedad argentina, no es un evento regional latinoamericano de primer orden) → descartar todos sus ítems. El Patriota es un medio argentino; la audiencia solo consume noticias del exterior cuando impactan directamente en Argentina.
+6. Si el cluster trata sobre un hecho extranjero SIN conexión con Argentina (no involucra actores argentinos, no afecta la economía/política/sociedad argentina, no es un evento regional latinoamericano de primer orden) → descartar todos sus ítems. Deportes y cultura con participación argentina SÍ son válidos (selección nacional, clubes en torneos internacionales, atletas/artistas argentinos en el exterior).
 
 RELEVANCIA ARGENTINA — ejemplos:
-  ✅ INCLUIR: acuerdo FMI-Argentina, decisiones del BCRA, política regional del Mercosur, precio de soja/commodities que afectan exportaciones, conflictos con vecinos
-  ❌ DESCARTAR: elecciones internas en España, escándalo corporativo en Alemania, política doméstica en Corea del Sur, farándula o deportes extranjeros sin participación argentina
+  ✅ INCLUIR: decisiones del BCRA, voto en el Congreso, selección argentina, River/Boca en Copa Libertadores, precio de soja/commodities que afectan exportaciones, acuerdo con el FMI, conflictos con vecinos
+  ❌ DESCARTAR: elecciones internas en España, escándalo corporativo en Alemania, deportes extranjeros sin ningún participante argentino, farándula internacional sin conexión argentina
 
-CAMPO "tema" — tiene que ser titular-ready, no etiqueta:
-  ✅ BIEN: "Milei anuncia acuerdo con el FMI por USD 20.000 millones"
+CAMPO "tema" — tiene que ser titular-ready, no etiqueta. Usá el actor real de la historia:
+  ✅ BIEN: "El Congreso aprueba el presupuesto con votos de la oposición"
   ✅ BIEN: "El dólar blue sube a $1.350 tras declaraciones del BCRA"
+  ✅ BIEN: "La selección argentina golea a Brasil y clasifica al Mundial"
   ❌ MAL: "política", "economía", "crisis en argentina", "noticias del día", "situación actual"
 
 ÍTEMS DEL CLUSTER:

@@ -207,9 +207,11 @@ def ingest_media(outlet_id: str | None = None) -> dict[str, Any]:
 
 @mcp.tool()
 async def ingest_all(ctx: Context) -> dict[str, Any]:
-    """Full monitoring tick: tweets from all accounts + articles from all outlets."""
-    tw = await ingest_twitter(ctx)
-    md = ingest_media()
+    """Full monitoring tick: tweets from all accounts + articles from all outlets (parallel)."""
+    tw, md = await asyncio.gather(
+        ingest_twitter(ctx),
+        asyncio.to_thread(ingest_media),
+    )
     return {"twitter": tw, "media": md, "at": _now()}
 
 

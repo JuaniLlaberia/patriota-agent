@@ -22,8 +22,8 @@
 ## Criterios obligatorios para títulos
 
 Un título DEBE:
-- Nombrar al actor principal (persona, organismo, institución): "Milei", "el BCRA", "la CGT", "el Congreso"
-- Describir la acción concreta: "anuncia", "aprueba", "rechaza", "sube", "convoca a"
+- Nombrar al actor real y específico de la historia: si actuó el BCRA, mencioná al BCRA; si votó el Congreso, mencioná al Congreso; si ganó River, mencioná a River. No atribuyas la acción a Milei si él no es el sujeto directo.
+- Describir la acción concreta: "anuncia", "aprueba", "rechaza", "sube", "convoca a", "golea"
 - Incluir el dato noticioso específico: cifra, decisión, declaración, resultado
 
 Un título NUNCA puede ser:
@@ -31,14 +31,18 @@ Un título NUNCA puede ser:
 - Un resumen genérico que podría publicarse cualquier día: "Últimas noticias sobre…", "Novedades en…", "La situación de…", "Resumen de contenidos"
 - Un título que no diga nada nuevo sin leer la nota: "Crisis política y económica en Argentina", "Impacto de los impuestos en la economía"
 - Un placeholder o descripción del cluster en lugar de un título periodístico
-- Una descripción del acto de publicar o del medio donde apareció la noticia: "Milei anuncia en Twitter su plan económico", "La CGT emite un comunicado en redes", "Medios reportan que...". El título narra el hecho mismo, no quién lo dijo ni en qué plataforma.
+- Una descripción del acto de publicar o del medio donde apareció la noticia: "La CGT emite un comunicado en redes", "Medios reportan que...". El título narra el hecho mismo, no quién lo dijo ni en qué plataforma.
+- Un título que menciona a Milei cuando él no es el actor directo de la noticia.
 
 Ejemplos concretos:
   ❌ "Impacto de los impuestos en la economía actual"
   ✅ "El Congreso aprueba el aumento en Bienes Personales con votos de la oposición"
 
+  ❌ "Milei habla sobre las paritarias" (si quien negoció fue el Ministerio de Trabajo)
+  ✅ "El Ministerio de Trabajo cierra paritarias con la UOM con un aumento del 4% mensual"
+
   ❌ "Crisis política y económica en Argentina"
-  ✅ "Massa convoca sesión extraordinaria para tratar el presupuesto antes del viernes"
+  ✅ "El BCRA sube la tasa de referencia al 40% en respuesta a la presión cambiaria"
 
   ❌ "Últimas noticias sobre eventos políticos"
   ✅ "Villarruel sale a responder las críticas de Bullrich por el manejo de la crisis"
@@ -47,7 +51,7 @@ Ejemplos concretos:
   ✅ "River empata con Boca en el Superclásico y pierde el liderato del Apertura"
 
   ❌ "Milei realiza anuncios sobre su plan económico en Twitter"
-  ✅ "Milei anuncia reducción de retenciones al campo y congelamiento del gasto"
+  ✅ "El Gobierno anuncia reducción de retenciones al campo y congelamiento del gasto"
 
 ## Léxico y estilo
 - Español rioplatense; evitar extranjerismos innecesarios.

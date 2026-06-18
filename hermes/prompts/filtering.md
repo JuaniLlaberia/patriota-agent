@@ -31,6 +31,10 @@ Para que un cluster sea editorial, debe cumplir AL MENOS UNO de estos criterios:
 - **Economía argentina**: tipo de cambio, inflación, presupuesto, BCRA, FMI, deuda externa,
   exportaciones agropecuarias, energía.
 - **Sociedad**: temas que afectan la vida cotidiana (salud, educación, seguridad, trabajo).
+- **Deportes**: fútbol argentino (AFA, Primera División, Copa Libertadores con clubes argentinos),
+  selección nacional en cualquier deporte, atletas argentinos en competencias internacionales
+  (Fórmula 1, tenis, básquet, rugby, etc.).
+- **Cultura y entretenimiento argentino**: cine, música, teatro, figuras culturales del país.
 - **Internacional relevante**: hechos con impacto probado y concreto en Argentina.
 
 ## Exclusiones
@@ -38,7 +42,8 @@ Para que un cluster sea editorial, debe cumplir AL MENOS UNO de estos criterios:
 Descartar sin proponer nota cuando:
 
 - Es política interna de un país extranjero sin conexión con Argentina.
-- Es farándula, entretenimiento o deportes extranjeros sin participación argentina.
+- Es deportes o entretenimiento extranjero donde no participa ningún argentino ni afecta
+  a ningún club o institución argentina.
 - Es una noticia local de otro país sin efecto en Argentina.
 - El único nexo con Argentina es especulativo ("podría afectar"); el impacto debe ser
   concreto y verificable en las fuentes del cluster.
