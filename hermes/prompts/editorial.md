@@ -31,6 +31,7 @@ Un título NUNCA puede ser:
 - Un resumen genérico que podría publicarse cualquier día: "Últimas noticias sobre…", "Novedades en…", "La situación de…", "Resumen de contenidos"
 - Un título que no diga nada nuevo sin leer la nota: "Crisis política y económica en Argentina", "Impacto de los impuestos en la economía"
 - Un placeholder o descripción del cluster en lugar de un título periodístico
+- Una descripción del acto de publicar o del medio donde apareció la noticia: "Milei anuncia en Twitter su plan económico", "La CGT emite un comunicado en redes", "Medios reportan que...". El título narra el hecho mismo, no quién lo dijo ni en qué plataforma.
 
 Ejemplos concretos:
   ❌ "Impacto de los impuestos en la economía actual"
@@ -44,6 +45,9 @@ Ejemplos concretos:
 
   ❌ "Deportes"
   ✅ "River empata con Boca en el Superclásico y pierde el liderato del Apertura"
+
+  ❌ "Milei realiza anuncios sobre su plan económico en Twitter"
+  ✅ "Milei anuncia reducción de retenciones al campo y congelamiento del gasto"
 
 ## Léxico y estilo
 - Español rioplatense; evitar extranjerismos innecesarios.

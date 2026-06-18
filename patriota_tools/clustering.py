@@ -36,6 +36,12 @@ DIFERENCIA CLAVE — evento vs categoría:
   ❌ BOLSA DE CATEGORÍA (dividir): cinco ítems sobre "política argentina" de eventos distintos
   ❌ DESCARTAR: ítem de farándula o irrelevante que quedó mezclado
 
+6. Si el cluster trata sobre un hecho extranjero SIN conexión con Argentina (no involucra actores argentinos, no afecta la economía/política/sociedad argentina, no es un evento regional latinoamericano de primer orden) → descartar todos sus ítems. El Patriota es un medio argentino; la audiencia solo consume noticias del exterior cuando impactan directamente en Argentina.
+
+RELEVANCIA ARGENTINA — ejemplos:
+  ✅ INCLUIR: acuerdo FMI-Argentina, decisiones del BCRA, política regional del Mercosur, precio de soja/commodities que afectan exportaciones, conflictos con vecinos
+  ❌ DESCARTAR: elecciones internas en España, escándalo corporativo en Alemania, política doméstica en Corea del Sur, farándula o deportes extranjeros sin participación argentina
+
 CAMPO "tema" — tiene que ser titular-ready, no etiqueta:
   ✅ BIEN: "Milei anuncia acuerdo con el FMI por USD 20.000 millones"
   ✅ BIEN: "El dólar blue sube a $1.350 tras declaraciones del BCRA"

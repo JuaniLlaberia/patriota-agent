@@ -52,38 +52,47 @@ Estados terminales: `PUBLICADO`, `DESCARTADO`, `ERROR_CMS`.
 
 ## Paso 2 — Propuesta de títulos
 
-1. Para cada cluster nuevo (`mcp_patriota_list_clusters(status="proposed")`), redactá un
-   título candidato con la voz de El Patriota (prompt `editorial`).
-2. El título DEBE cumplir los criterios del prompt editorial. Verificá antes de registrar:
+1. Traé todos los clusters y artículos pendientes:
+   - `mcp_patriota_list_clusters(status="proposed")` → todos los clusters esperando título.
+   - `mcp_patriota_list_articles(status="title_proposed")` → artículos que ya tienen título propuesto.
+   - Identificá los `cluster_id` que ya tienen artículo en `title_proposed`; esos no necesitan título nuevo pero sí aparecen en la lista final.
+
+2. Para cada cluster SIN artículo propuesto, redactá un título candidato con la voz de El Patriota
+   (prompt `editorial`). Verificá antes de registrar:
    - ¿Nombra al actor principal (persona u organismo concreto)?
    - ¿Describe una acción específica ocurrida ahora?
    - ¿Incluye el dato noticioso (cifra, decisión, declaración)?
-   Si no cumple las tres condiciones, reescribilo. Nunca uses etiquetas de categoría
-   ("Política", "Economía") ni frases genéricas ("últimas noticias", "crisis en Argentina").
-3. Registrá con `mcp_patriota_create_article(title, cluster_id)` (queda `title_proposed`).
-3. Enviá al grupo en este formato exacto:
+   - ¿Narra el hecho y no el acto de publicar ni el medio donde apareció?
+   Si no cumple las cuatro condiciones, reescribilo. Nunca uses etiquetas de categoría
+   ("Política", "Economía") ni frases genéricas ("últimas noticias", "crisis en Argentina"),
+   y nunca menciones que la noticia "fue publicada en Twitter" o "según medios".
+
+3. Registrá cada nuevo título con `mcp_patriota_create_article(title, cluster_id)`.
+
+4. Enviá al grupo TODOS los artículos en `title_proposed` (previos + recién creados),
+   usando el `article_id` como identificador. Formato exacto:
 
 ```
 📰 *Notas disponibles — [DD/MM/YYYY HH:MM]*
 
 🏛️ POLÍTICA
-1. [título]
-2. [título]
+#42 — [título]
+#43 — [título]
 
 💰 ECONOMÍA
-3. [título]
+#44 — [título]
 
-@AgentePatriotaBot /aprobar para confirmar todos, o indicá cambios por número.
+@AgentePatriotaBot /aprobar para confirmar todos, o indicá cambios por ID (ej: /modificar 42 [instrucción]).
 ```
 
 Asigná la categoría según el tema del cluster (POLÍTICA, ECONOMÍA, SOCIEDAD, INTERNACIONALES, etc.).
 
-4. Esperá feedback:
+5. Esperá feedback:
    - `/aprobar` → aprobá todos los títulos vigentes y avanzá al Paso 3 para cada uno.
-   - `/aprobar 1 3` → aprobá solo los ítems numerados (espacio entre números).
-   - `/modificar 2 [instrucción]` → reformulá el título 2 según la instrucción y re-enviá.
-   - `/modificar 1,3 [instrucción]` → modificá múltiples (coma sin espacio).
-   - `/descartar 2` → marcá el artículo 2 como rechazado.
+   - `/aprobar 42 44` → aprobá solo los artículos con esos IDs (espacio entre IDs).
+   - `/modificar 43 [instrucción]` → reformulá el título del artículo #43 y re-enviá.
+   - `/modificar 43,45 [instrucción]` → modificá múltiples (coma sin espacio).
+   - `/descartar 43` → marcá el artículo #43 como rechazado.
 
 ---
 
@@ -132,10 +141,10 @@ Para cada artículo en `summary_approved`:
 | Comando | Acción |
 |---|---|
 | `@AgentePatriotaBot /aprobar` | Aprueba todos los ítems pendientes del estado actual |
-| `@AgentePatriotaBot /aprobar 1 3` | Aprueba ítems específicos (espacio entre números) |
-| `@AgentePatriotaBot /modificar 2 [instrucción]` | Modifica el ítem 2 con la instrucción dada |
-| `@AgentePatriotaBot /modificar 1,3 [instrucción]` | Modifica múltiples ítems |
-| `@AgentePatriotaBot /descartar 2` | Descarta el ítem 2 del ciclo actual |
+| `@AgentePatriotaBot /aprobar 42 44` | Aprueba los artículos con esos IDs (espacio entre IDs) |
+| `@AgentePatriotaBot /modificar 43 [instrucción]` | Modifica el artículo #43 con la instrucción dada |
+| `@AgentePatriotaBot /modificar 43,45 [instrucción]` | Modifica múltiples artículos (coma sin espacio) |
+| `@AgentePatriotaBot /descartar 43` | Descarta el artículo #43 del ciclo actual |
 | `@AgentePatriotaBot /estado` | Lista todos los clusters activos con estado y etapa |
 | `@AgentePatriotaBot /prompt-editorial` | Muestra el prompt editorial actual |
 | `@AgentePatriotaBot /prompt-filtrado` | Muestra el prompt de filtrado actual |

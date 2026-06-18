@@ -10,7 +10,7 @@ Run standalone for testing:  patriota-tools   (or: python -m patriota_tools.serv
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import yaml
@@ -31,7 +31,7 @@ db.init_db(settings.db_path)
 
 def _seed_prompts() -> None:
     """Seed the 3 editable prompts from hermes/prompts/*.md if none exist yet."""
-    for name in ("editorial", "filtering", "twitter", "recheck"):
+    for name in ("editorial", "filtering", "twitter", "recheck", "working_hours"):
         if db.get_latest_prompt(settings.db_path, name):
             continue
         path = settings.prompts / f"{name}.md"
@@ -97,6 +97,43 @@ def set_prompt(name: str, content: str, editor: str | None = None) -> dict[str, 
 def list_prompt_versions(name: str) -> list[dict[str, Any]]:
     """History of all saved versions of an editorial prompt."""
     return db.list_prompt_versions(settings.db_path, name)
+
+
+# ── schedule / working hours ─────────────────────────────────────────────────────
+@mcp.tool()
+def get_schedule_status() -> dict[str, Any]:
+    """Check if current Buenos Aires time (UTC-3) falls within editorial working hours.
+
+    Reads the 'working_hours' prompt (format 'HH:MM-HH:MM'). '00:00' as end = midnight.
+    Editors can change the window via /editar-prompt working_hours [HH:MM-HH:MM].
+    Returns in_working_hours bool plus current time and configured window for transparency.
+    """
+    prompt = db.get_latest_prompt(settings.db_path, "working_hours")
+    window = (prompt or {}).get("content", "07:00-00:00").strip().splitlines()[0].strip()
+
+    BUE_TZ = timezone(timedelta(hours=-3))
+    now_bue = datetime.now(BUE_TZ)
+    now_minutes = now_bue.hour * 60 + now_bue.minute
+
+    try:
+        start_str, end_str = window.split("-")
+        sh, sm = map(int, start_str.strip().split(":"))
+        eh, em = map(int, end_str.strip().split(":"))
+        start_min = sh * 60 + sm
+        end_min = eh * 60 + em
+        if end_min == 0:  # "00:00" means midnight = end of day
+            end_min = 24 * 60
+        in_window = start_min <= now_minutes < end_min
+    except Exception:
+        in_window = True  # fail open: don't silently block editorial on a parse error
+        window = f"(parse error: {window!r})"
+
+    return {
+        "in_working_hours": in_window,
+        "window_bue": window,
+        "now_bue": now_bue.strftime("%H:%M"),
+        "day": now_bue.strftime("%A"),
+    }
 
 
 # ── ingestion ───────────────────────────────────────────────────────────────────
