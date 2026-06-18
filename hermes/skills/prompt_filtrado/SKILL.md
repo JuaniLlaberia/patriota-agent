@@ -6,12 +6,12 @@ description: >
 
 # Ver prompt de filtrado
 
-Llamá `mcp_patriota_get_prompt("filtering")` y mostrá el campo `content` completo:
+Llamá `mcp_patriota_get_prompt("filtering")` y mostrá el campo `content` completo.
+
+Si el campo `note` contiene "default" agregá un aviso al pie: _"(usando versión predeterminada — podés personalizarlo con /editar_prompt filtering)"_.
 
 ```
 📝 *Prompt de filtrado vigente*
 
 [content]
 ```
-
-Si no hay versión definida avisá: "Sin prompt de filtrado definido todavía."

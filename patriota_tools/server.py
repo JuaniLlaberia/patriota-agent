@@ -80,7 +80,12 @@ def get_prompt(name: str) -> dict[str, Any]:
     editors' latest guidance.
     """
     latest = db.get_latest_prompt(settings.db_path, name)
-    return latest or {"name": name, "content": "", "note": "sin versión definida todavía"}
+    if latest:
+        return latest
+    path = settings.prompts / f"{name}.md"
+    if path.exists():
+        return {"name": name, "content": path.read_text(encoding="utf-8"), "note": "default (aún no personalizado)"}
+    return {"name": name, "content": "", "note": "sin versión definida todavía"}
 
 
 @mcp.tool()

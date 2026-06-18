@@ -6,12 +6,12 @@ description: >
 
 # Ver prompt de Twitter
 
-Llamá `mcp_patriota_get_prompt("twitter")` y mostrá el campo `content` completo:
+Llamá `mcp_patriota_get_prompt("twitter")` y mostrá el campo `content` completo.
+
+Si el campo `note` contiene "default" agregá un aviso al pie: _"(usando versión predeterminada — podés personalizarlo con /editar_prompt twitter)"_.
 
 ```
 📝 *Prompt de Twitter vigente*
 
 [content]
 ```
-
-Si no hay versión definida avisá: "Sin prompt de Twitter definido todavía."
