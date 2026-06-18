@@ -14,6 +14,9 @@ model: openai/gpt-4o-mini
 
 generation:
   temperature: 0.1
+  max_tokens: 4096    # cap completion budget; routine calls never need 16 K
+
+mcp_call_timeout_s: 300  # ingest_all can take 2-4 min; default 120 s is too short
 
 memory_enabled: true
 user_profile_enabled: true

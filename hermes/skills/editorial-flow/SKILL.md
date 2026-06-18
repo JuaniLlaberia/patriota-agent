@@ -54,7 +54,13 @@ Estados terminales: `PUBLICADO`, `DESCARTADO`, `ERROR_CMS`.
 
 1. Para cada cluster nuevo (`mcp_patriota_list_clusters(status="proposed")`), redactá un
    título candidato con la voz de El Patriota (prompt `editorial`).
-2. Registrá con `mcp_patriota_create_article(title, cluster_id)` (queda `title_proposed`).
+2. El título DEBE cumplir los criterios del prompt editorial. Verificá antes de registrar:
+   - ¿Nombra al actor principal (persona u organismo concreto)?
+   - ¿Describe una acción específica ocurrida ahora?
+   - ¿Incluye el dato noticioso (cifra, decisión, declaración)?
+   Si no cumple las tres condiciones, reescribilo. Nunca uses etiquetas de categoría
+   ("Política", "Economía") ni frases genéricas ("últimas noticias", "crisis en Argentina").
+3. Registrá con `mcp_patriota_create_article(title, cluster_id)` (queda `title_proposed`).
 3. Enviá al grupo en este formato exacto:
 
 ```

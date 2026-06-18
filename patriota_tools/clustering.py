@@ -19,19 +19,27 @@ logger = logging.getLogger(__name__)
 
 _VALIDATION_PROMPT = """\
 Sos un editor de noticias argentino. Te doy un grupo de noticias y tweets que un algoritmo
-agrupó por similitud semántica. Tu tarea es reorganizarlos editorialmente.
+agrupó por similitud semántica. Tu tarea es reorganizarlos en historias noticiosas CONCRETAS.
 
-REGLAS:
-1. Si todos cubren el mismo evento o hecho noticioso concreto → devolvé un único cluster
-2. Si hay ítems de temas distintos mezclados → separarlos en clusters distintos, uno por tema
-3. Si hay ítems claramente no relacionados con ningún otro → descartarlos (DESCARTAR)
-4. Nunca agrupar ítems que traten el mismo tema general pero eventos distintos
+REGLAS ESTRICTAS:
+1. Un cluster es válido SOLO si todos sus ítems cubren el MISMO hecho concreto y reciente.
+   "Mismo hecho" = mismo actor + misma acción + mismo momento (no el mismo tema general).
+2. Si el grupo mezcla eventos distintos (aunque sean del mismo rubro) → separarlos, un cluster por evento.
+3. Si un cluster tiene más de 6 ítems → casi seguro es una bolsa de categoría; dividilo en eventos específicos.
+4. Ítems sin relación con ningún evento concreto compartido → descartarlos.
+5. El campo "tema" DEBE describir el evento específico (actores + acción + contexto), NUNCA la categoría.
 
-CRITERIO CLAVE: mismo evento = mismo hecho concreto ocurrido en las últimas horas.
-  ✅ mismo cluster: dos tweets y un artículo sobre el discurso de Milei de esta mañana
-  ✅ mismo cluster: tres fuentes sobre la suba del dólar de hoy
-  ❌ clusters separados: nota sobre inflación de hoy + tweet sobre el FMI (temas distintos aunque relacionados)
-  ❌ descartar: tweet sobre farándula que quedó en el cluster por error
+DIFERENCIA CLAVE — evento vs categoría:
+  ✅ VÁLIDO — mismo evento: tweet + artículo + nota todos sobre el mismo discurso de Milei ante el FMI
+  ✅ VÁLIDO — mismo evento: tres fuentes sobre la misma suba del dólar de hoy
+  ❌ BOLSA DE CATEGORÍA (dividir): artículo sobre inflación + tweet sobre el FMI + nota sobre el dólar
+  ❌ BOLSA DE CATEGORÍA (dividir): cinco ítems sobre "política argentina" de eventos distintos
+  ❌ DESCARTAR: ítem de farándula o irrelevante que quedó mezclado
+
+CAMPO "tema" — tiene que ser titular-ready, no etiqueta:
+  ✅ BIEN: "Milei anuncia acuerdo con el FMI por USD 20.000 millones"
+  ✅ BIEN: "El dólar blue sube a $1.350 tras declaraciones del BCRA"
+  ❌ MAL: "política", "economía", "crisis en argentina", "noticias del día", "situación actual"
 
 ÍTEMS DEL CLUSTER:
 {items_block}
@@ -41,7 +49,7 @@ Respondé ÚNICAMENTE con JSON válido en este formato:
   "clusters": [
     {{
       "ids": ["id1", "id2"],
-      "tema": "descripción breve del tema en común"
+      "tema": "descripción específica del evento — actores + acción concreta"
     }}
   ],
   "descartar": ["id3", "id4"]
@@ -87,10 +95,13 @@ class HybridClusterer:
         normed = embeddings / norms
         dist = np.clip(1.0 - (normed @ normed.T), 0.0, 2.0).astype(np.float64)
 
+        # "leaf" selects the finest-grained clusters in the condensed tree,
+        # preventing large category bags. "eom" (the default) does the opposite:
+        # it merges sub-clusters aggressively, producing fewer but broader groups.
         return hdbscan.HDBSCAN(
             min_cluster_size=2,
             metric="precomputed",
-            cluster_selection_method="eom",
+            cluster_selection_method="leaf",
         ).fit_predict(dist)
 
     # ── Phase 2: LLM validation ──────────────────────────────────────────────
