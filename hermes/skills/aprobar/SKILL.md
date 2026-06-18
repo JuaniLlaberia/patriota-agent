@@ -43,8 +43,9 @@ Fuentes ([N]):
 
 El editor aprobó el resumen. Generá el borrador completo:
 
-1. Actualizá el estado: `mcp_patriota_update_article(article_id, status="summary_approved")`.
-2. Generá el borrador: `mcp_patriota_generate_article_draft(article_id)`.
+1. Verificá que el artículo existe: `mcp_patriota_get_article(article_id)`. Si devuelve error o vacío, avisá al grupo "Artículo #[ID] no encontrado" y detenete — no llames a `generate_article_draft`.
+2. Actualizá el estado: `mcp_patriota_update_article(article_id, status="summary_approved")`.
+3. Generá el borrador: `mcp_patriota_generate_article_draft(article_id)`.
 3. Confirmá al grupo:
 ```
 ✅ *Borrador generado — Artículo #[ID]*
