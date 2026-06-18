@@ -15,7 +15,6 @@ hermes cron create "every 45m" \
   "Ejecutá un ciclo de monitoreo editorial con la skill editorial-flow: primero corré mcp_patriota_ingest_all para ingestar nuevas fuentes, luego mcp_patriota_cluster_items_semantically para agruparlas automáticamente por similitud semántica, y si se crearon clusters nuevos proponé al grupo los títulos candidatos numerados. No publiques nada; esperá la aprobación del equipo." \
   --name monitoreo \
   --skill editorial-flow \
-  --model openai/gpt-4o-mini \
   --deliver telegram \
   --workdir ~/.hermes
 ```

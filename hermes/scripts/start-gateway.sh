@@ -68,7 +68,6 @@ else
         "every 45m" \
         "Ejecutá un ciclo de monitoreo editorial con la skill editorial-flow: primero corré mcp_patriota_ingest_all para ingestar nuevas fuentes, luego mcp_patriota_cluster_items_semantically para agruparlas por similitud semántica, y si se crearon clusters nuevos proponé al grupo los títulos candidatos numerados. Si no hay clusters nuevos avisá brevemente y terminá. No publiques nada; esperá la aprobación del equipo." \
         --skill editorial-flow \
-        --model openai/gpt-4o-mini \
         --deliver telegram \
         --workdir "$HERMES_WORKDIR"
 
@@ -77,7 +76,6 @@ else
         "0 12 * * *" \
         "Ejecutá el ciclo diario de Twitter con la skill twitter-flow: traé tendencias (WOEID 455827), filtrá según el prompt twitter y proponé al grupo borradores de tweets numerados. No publiques sin @AgentePatriotaBot /aprobar." \
         --skill twitter-flow \
-        --model openai/gpt-4o-mini \
         --deliver telegram \
         --workdir "$HERMES_WORKDIR"
 
@@ -86,7 +84,6 @@ else
         "0 12 * * 5" \
         "Generá el resumen semanal con la skill weekly-summary y publicalo al CMS en estado borrador; avisá al grupo con el cms_id." \
         --skill weekly-summary \
-        --model openai/gpt-4o-mini \
         --deliver telegram \
         --workdir "$HERMES_WORKDIR"
 
