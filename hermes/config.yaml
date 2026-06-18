@@ -16,7 +16,7 @@ generation:
   temperature: 0.1
   max_tokens: 4096    # cap completion budget; routine calls never need 16 K
 
-mcp_call_timeout_s: 300  # ingest_all can take 2-4 min; default 120 s is too short
+mcp_call_timeout_s: 600  # ingest_all (parallel twitter+media) can take up to 5 min
 
 memory_enabled: true
 user_profile_enabled: true
@@ -43,7 +43,7 @@ mcp_servers:
 # ── Cron ───────────────────────────────────────────────────────────────────────
 cron:
   wrap_response: false
-  script_timeout_seconds: 300
+  script_timeout_seconds: 900  # ingest + cluster + editorial can take up to 15 min total
 
 # ── Persona / operating rules ──────────────────────────────────────────────────
 # Persistent persona + house rules live in hermes/AGENTS.md, copied to
