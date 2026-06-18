@@ -135,6 +135,15 @@ reset_state() {
     touch "$HERMES_HOME/.needs-clean"
     chown "$INSTALL_USER" "$HERMES_HOME/.needs-clean"
     check "memory wipe scheduled for next gateway start"
+
+    # Clear prompt_versions so server.py re-seeds from the latest .md files on
+    # next startup. Editor customisations are intentionally reset on deploy;
+    # the canonical defaults live in hermes/prompts/*.md (version-controlled).
+    DB_PATH="$HERMES_HOME/patriota.db"
+    if [ -f "$DB_PATH" ]; then
+        sqlite3 "$DB_PATH" "DELETE FROM prompt_versions;"
+        check "prompt_versions cleared (will re-seed from /opt/patriota/prompts/ on next start)"
+    fi
 }
 
 # ── 5. Env file template ──────────────────────────────────────────────────────
