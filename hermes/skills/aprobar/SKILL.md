@@ -21,7 +21,7 @@ los artículos con `status='title_proposed'`.
 
 El editor aprobó el título. Generá el resumen editorial:
 
-1. Cargá el prompt: `mcp_patriota_get_prompt("filtering")`.
+1. Cargá el prompt: `mcp_patriota_fetch_prompt("filtering")`.
 2. Cargá las fuentes: `mcp_patriota_get_cluster(cluster_id)`.
 3. Redactá el ángulo editorial (2-3 oraciones) y listá las fuentes.
 4. Guardá el resumen: `mcp_patriota_update_article(article_id, summary=resumen_redactado)`.

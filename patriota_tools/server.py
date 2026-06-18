@@ -73,7 +73,7 @@ def sources() -> dict[str, Any]:
 
 # ── editable editorial prompts (editorial | filtering | twitter) ─────────────────
 @mcp.tool()
-def get_prompt(name: str) -> dict[str, Any]:
+def fetch_prompt(name: str) -> dict[str, Any]:
     """Get the current version of an editorial prompt ('editorial'|'filtering'|'twitter').
 
     Always call this before proposing titles, filtering, or drafting so you use the
