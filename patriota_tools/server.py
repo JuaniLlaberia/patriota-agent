@@ -444,6 +444,13 @@ def list_tweets(status: str | None = None) -> list[dict[str, Any]]:
     return db.list_tweets(settings.db_path, status=status)
 
 
+@mcp.tool()
+def reject_tweet(tweet_id: int) -> dict[str, Any]:
+    """Mark a proposed tweet as rejected so it no longer appears in the pending list."""
+    db.update_tweet(settings.db_path, tweet_id, status="rejected")
+    return {"ok": True, "tweet_id": tweet_id, "status": "rejected"}
+
+
 # ── editor message log ──────────────────────────────────────────────────────────
 @mcp.tool()
 def log_editor(direction: str, text: str) -> dict[str, Any]:
