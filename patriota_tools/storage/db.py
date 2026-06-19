@@ -162,7 +162,7 @@ def list_source_items(
         return _rows(conn.execute(q, params))
 
 
-def list_unprocessed_items(db_path: str, limit: int = 200) -> list[dict[str, Any]]:
+def list_unprocessed_items(db_path: str, limit: int = 500) -> list[dict[str, Any]]:
     """Items eligible for clustering: status 'new' or 'solo' (leftover from prior cycles)."""
     with get_conn(db_path) as conn:
         return _rows(conn.execute(

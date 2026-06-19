@@ -2,7 +2,7 @@
 
 Two-phase hybrid approach:
   1. Embeddings phase: text-embedding-3-small → cosine distance matrix → HDBSCAN
-  2. LLM validation: each candidate cluster reviewed by an editor LLM that
+  2. LLM validation: HDBSCAN clusters are sent in batches to an editor LLM that
      reorganises or discards items before they become confirmed clusters.
 """
 
@@ -17,9 +17,12 @@ import openai
 
 logger = logging.getLogger(__name__)
 
-_VALIDATION_PROMPT = """\
-Sos un editor de noticias argentino. Te doy un grupo de noticias y tweets que un algoritmo
-agrupó por similitud semántica. Tu tarea es reorganizarlos en historias noticiosas CONCRETAS.
+_BATCH_SIZE = 10  # HDBSCAN clusters per LLM validation call
+
+_BATCH_VALIDATION_PROMPT = """\
+Sos un editor de noticias argentino. Te doy varios grupos de noticias y tweets \
+(CLUSTER_0, CLUSTER_1, etc.) que un algoritmo agrupó por similitud semántica. \
+Tu tarea es revisar cada grupo y reorganizarlos en historias noticiosas CONCRETAS.
 
 REGLAS ESTRICTAS:
 1. Un cluster es válido SOLO si todos sus ítems cubren el MISMO hecho concreto y reciente.
@@ -37,11 +40,18 @@ DIFERENCIA CLAVE — evento vs categoría:
   ❌ BOLSA DE CATEGORÍA (dividir): cinco ítems sobre "política argentina" de eventos distintos
   ❌ DESCARTAR: ítem de farándula o irrelevante que quedó mezclado
 
-6. Si el cluster trata sobre un hecho extranjero SIN conexión con Argentina (no involucra actores argentinos, no afecta la economía/política/sociedad argentina, no es un evento regional latinoamericano de primer orden) → descartar todos sus ítems. Deportes y cultura con participación argentina SÍ son válidos (selección nacional, clubes en torneos internacionales, atletas/artistas argentinos en el exterior).
+6. Si el cluster trata sobre un hecho extranjero SIN conexión con Argentina (no involucra actores \
+argentinos, no afecta la economía/política/sociedad argentina, no es un evento regional \
+latinoamericano de primer orden) → descartar todos sus ítems. Deportes y cultura con \
+participación argentina SÍ son válidos (selección nacional, clubes en torneos internacionales, \
+atletas/artistas argentinos en el exterior).
 
 RELEVANCIA ARGENTINA — ejemplos:
-  ✅ INCLUIR: decisiones del BCRA, voto en el Congreso, selección argentina, River/Boca en Copa Libertadores, precio de soja/commodities que afectan exportaciones, acuerdo con el FMI, conflictos con vecinos
-  ❌ DESCARTAR: elecciones internas en España, escándalo corporativo en Alemania, deportes extranjeros sin ningún participante argentino, farándula internacional sin conexión argentina
+  ✅ INCLUIR: decisiones del BCRA, voto en el Congreso, selección argentina, River/Boca en Copa \
+Libertadores, precio de soja/commodities que afectan exportaciones, acuerdo con el FMI, \
+conflictos con vecinos
+  ❌ DESCARTAR: elecciones internas en España, escándalo corporativo en Alemania, deportes \
+extranjeros sin ningún participante argentino, farándula internacional sin conexión argentina
 
 CAMPO "tema" — tiene que ser titular-ready, no etiqueta. Usá el actor real de la historia:
   ✅ BIEN: "El Congreso aprueba el presupuesto con votos de la oposición"
@@ -49,10 +59,10 @@ CAMPO "tema" — tiene que ser titular-ready, no etiqueta. Usá el actor real de
   ✅ BIEN: "La selección argentina golea a Brasil y clasifica al Mundial"
   ❌ MAL: "política", "economía", "crisis en argentina", "noticias del día", "situación actual"
 
-ÍTEMS DEL CLUSTER:
-{items_block}
+{clusters_block}
 
-Respondé ÚNICAMENTE con JSON válido en este formato:
+Respondé ÚNICAMENTE con JSON válido en este formato (un solo objeto con todos los clusters \
+validados y todos los ítems descartados de todos los grupos):
 {{
   "clusters": [
     {{
@@ -65,7 +75,7 @@ Respondé ÚNICAMENTE con JSON válido en este formato:
 
 
 class HybridClusterer:
-    """Embed → HDBSCAN → LLM validation pipeline."""
+    """Embed → HDBSCAN → batched LLM validation pipeline."""
 
     def __init__(
         self,
@@ -112,30 +122,42 @@ class HybridClusterer:
             cluster_selection_method="leaf",
         ).fit_predict(dist)
 
-    # ── Phase 2: LLM validation ──────────────────────────────────────────────
+    # ── Phase 2: Batched LLM validation ─────────────────────────────────────
 
-    def validate_cluster_with_llm(
-        self, cluster_items: list[dict[str, Any]]
+    def _format_item(self, item: dict[str, Any]) -> str:
+        raw: dict = {}
+        try:
+            raw = json.loads(item.get("raw") or "{}")
+        except (json.JSONDecodeError, TypeError):
+            pass
+        engagement = raw.get("likeCount") or raw.get("likes") or ""
+        eng_str = f" | engagement: {engagement}" if engagement else ""
+        return (
+            f"- id: {item['id']}\n"
+            f"  titulo: {item.get('title') or '(sin título)'}\n"
+            f"  fuente: {item.get('source') or ''}\n"
+            f"  url: {item.get('url') or ''}\n"
+            f"  fecha: {item.get('published_at') or item.get('ingested_at') or ''}"
+            f"{eng_str}"
+        )
+
+    def validate_clusters_batch(
+        self, cluster_batch: list[list[dict[str, Any]]]
     ) -> dict[str, Any]:
-        lines = []
-        for item in cluster_items:
-            raw: dict = {}
-            try:
-                raw = json.loads(item.get("raw") or "{}")
-            except (json.JSONDecodeError, TypeError):
-                pass
-            engagement = raw.get("likeCount") or raw.get("likes") or ""
-            eng_str = f" | engagement: {engagement}" if engagement else ""
-            lines.append(
-                f"- id: {item['id']}\n"
-                f"  titulo: {item.get('title') or '(sin título)'}\n"
-                f"  fuente: {item.get('source') or ''}\n"
-                f"  url: {item.get('url') or ''}\n"
-                f"  fecha: {item.get('published_at') or item.get('ingested_at') or ''}"
-                f"{eng_str}"
-            )
+        """Validate a batch of HDBSCAN clusters in a single LLM call.
 
-        prompt = _VALIDATION_PROMPT.format(items_block="\n".join(lines))
+        Sending N clusters together instead of N individual calls reduces API
+        round-trips from O(clusters) to O(clusters / _BATCH_SIZE).
+        Returns {"clusters": [...], "descartar": [...]} with IDs drawn from any
+        cluster in the batch.
+        """
+        blocks = []
+        for i, cluster_items in enumerate(cluster_batch):
+            lines = [f"CLUSTER_{i}:"]
+            lines.extend(self._format_item(it) for it in cluster_items)
+            blocks.append("\n".join(lines))
+
+        prompt = _BATCH_VALIDATION_PROMPT.format(clusters_block="\n\n".join(blocks))
 
         for attempt in range(2):
             try:
@@ -143,8 +165,8 @@ class HybridClusterer:
                     model=self._llm_model,
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.1,
-                    max_tokens=1000,
-                    timeout=30,
+                    max_tokens=2000,
+                    timeout=60,
                 )
                 content = (resp.choices[0].message.content or "").strip()
                 if content.startswith("```"):
@@ -154,18 +176,18 @@ class HybridClusterer:
                 return json.loads(content.strip())
             except Exception as exc:
                 if attempt == 0:
-                    logger.warning("LLM cluster validation failed (retrying): %s", exc)
+                    logger.warning("LLM batch validation failed (retrying): %s", exc)
                 else:
-                    logger.error("LLM cluster validation failed twice: %s", exc)
-                    return {
-                        "clusters": [
-                            {
-                                "ids": [str(i["id"]) for i in cluster_items],
+                    logger.error("LLM batch validation failed twice: %s", exc)
+                    # Fallback: pass through all clusters with ≥2 items unvalidated
+                    fallback: list[dict] = []
+                    for cluster_items in cluster_batch:
+                        if len(cluster_items) >= 2:
+                            fallback.append({
+                                "ids": [str(it["id"]) for it in cluster_items],
                                 "tema": "cluster sin validar",
-                            }
-                        ],
-                        "descartar": [],
-                    }
+                            })
+                    return {"clusters": fallback, "descartar": []}
         return {"clusters": [], "descartar": []}
 
     # ── Full pipeline ────────────────────────────────────────────────────────
@@ -192,11 +214,21 @@ class HybridClusterer:
             by_label.setdefault(int(label), []).append(item)
 
         noise_ids: list[int] = [it["id"] for it in by_label.pop(-1, [])]
+        cluster_list = list(by_label.values())
+
+        # Global ID → item lookup (IDs are unique across all clusters)
+        id_to_item: dict[str, dict] = {
+            str(it["id"]): it
+            for cluster_items in cluster_list
+            for it in cluster_items
+        }
+
         validated: list[dict[str, Any]] = []
 
-        for cluster_items in by_label.values():
-            result = self.validate_cluster_with_llm(cluster_items)
-            id_to_item = {str(it["id"]): it for it in cluster_items}
+        # Send clusters in batches of _BATCH_SIZE to reduce LLM API round-trips
+        for batch_start in range(0, len(cluster_list), _BATCH_SIZE):
+            batch = cluster_list[batch_start : batch_start + _BATCH_SIZE]
+            result = self.validate_clusters_batch(batch)
 
             for cluster in result.get("clusters", []):
                 ids = [int(i) for i in cluster["ids"] if i in id_to_item]
