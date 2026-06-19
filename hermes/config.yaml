@@ -16,7 +16,8 @@ generation:
   temperature: 0.1
   max_tokens: 4096    # cap completion budget; routine calls never need 16 K
 
-mcp_call_timeout_s: 600  # ingest_all (parallel twitter+media) can take up to 5 min
+# MCP per-tool-call timeout is set by install_mcp.py via PATRIOTA_MCP_TIMEOUT (default 600s).
+# Do NOT set mcp_call_timeout_s here — install_mcp.py overwrites mcp_servers on every start.
 
 memory_enabled: true
 user_profile_enabled: true
