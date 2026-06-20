@@ -148,18 +148,15 @@ reset_state() {
 
 # ── 5. Env file template ──────────────────────────────────────────────────────
 write_env_template() {
-    info "Writing env template to $ENV_FILE..."
+    info "Writing env file to $ENV_FILE..."
     mkdir -p /etc/patriota
-
-    if [ -f "$ENV_FILE" ]; then
-        warn "$ENV_FILE already exists — not overwriting"
-        return
-    fi
 
     # Resolve hermes binary path for PATH in service
     HERMES_BIN_DIR="$(dirname "$(su -l "$INSTALL_USER" -c "command -v hermes")")"
 
-    cat > "$ENV_FILE" << EOF
+    if [ ! -f "$ENV_FILE" ]; then
+        # Fresh install — write the full template including secrets placeholders
+        cat > "$ENV_FILE" << EOF
 # /etc/patriota/env — El Patriota gateway secrets.
 # Fill in all required values, then: sudo systemctl start patriota-gateway
 
@@ -198,9 +195,31 @@ PATRIOTA_DB_PATH=$HERMES_HOME/patriota.db
 PATRIOTA_PROMPTS_DIR=$STATIC_DIR/prompts
 USE_MOCKS=false
 EOF
-    chmod 640 "$ENV_FILE"
-    chown root:"$INSTALL_USER" "$ENV_FILE"
-    check "$ENV_FILE written — fill in secrets before starting the service"
+        chmod 640 "$ENV_FILE"
+        chown root:"$INSTALL_USER" "$ENV_FILE"
+        check "$ENV_FILE written — fill in secrets before starting the service"
+    else
+        # Re-deploy — secrets are preserved; only update/add the resolved vars
+        # (paths computed by install.sh that may change between deploys).
+        warn "$ENV_FILE already exists — preserving secrets, updating resolved vars"
+        _upsert_env() {
+            local key="$1" val="$2"
+            if grep -q "^${key}=" "$ENV_FILE"; then
+                sed -i "s|^${key}=.*|${key}=${val}|" "$ENV_FILE"
+            else
+                echo "${key}=${val}" >> "$ENV_FILE"
+            fi
+        }
+        _upsert_env "HERMES_HOME"           "$HERMES_HOME"
+        _upsert_env "HERMES_WORKDIR"        "$HERMES_HOME"
+        _upsert_env "PATH"                  "$HERMES_BIN_DIR:/usr/local/bin:/usr/bin:/bin"
+        _upsert_env "PATRIOTA_INSTALL_MCP"  "$VENV_DIR/bin/patriota-install-mcp"
+        _upsert_env "PATRIOTA_MCP_COMMAND"  "$VENV_DIR/bin/patriota-tools"
+        _upsert_env "PATRIOTA_DB_PATH"      "$HERMES_HOME/patriota.db"
+        _upsert_env "PATRIOTA_PROMPTS_DIR"  "$STATIC_DIR/prompts"
+        _upsert_env "USE_MOCKS"             "false"
+        check "resolved vars updated in $ENV_FILE"
+    fi
 }
 
 # ── 6. systemd service ────────────────────────────────────────────────────────
