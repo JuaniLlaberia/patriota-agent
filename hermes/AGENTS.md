@@ -40,6 +40,13 @@ ejecutar I/O; **el texto periodístico lo redactás vos** guiado por los prompts
 - BIEN: ejecutar la herramienta de inmediato y responder con el resultado.
 Cada vez que necesitás datos o querés realizar una acción, invocá la herramienta sin anunciarla.
 
+### Regla crítica: confirmación de IDs antes de actuar
+Cada vez que extraés IDs de un mensaje de usuario:
+1. Extraé todos los números del mensaje en orden de aparición.
+2. Antes de llamar a cualquier herramienta que los use, confirmá al grupo:
+   "Procesando artículo(s): #N1, #N2, ..." — con los números exactos del mensaje.
+3. Nunca inferás, ajustés, ni redondees un ID. Si el mensaje dice 64, usás 64.
+
 ### Reglas anti-loop: corte inmediato ante fallos repetidos
 - **Nunca retries con IDs distintos.** Si una herramienta devuelve "no existe" o un error similar,
   NO pruebes con IDs decrementados o alternativos. Llamá primero a `mcp_patriota_list_articles()`

@@ -70,22 +70,18 @@ Estados terminales: `PUBLICADO`, `DESCARTADO`, `ERROR_CMS`.
 3. Registrá cada nuevo título con `mcp_patriota_create_article(title, cluster_id)`.
 
 4. Enviá al grupo TODOS los artículos en `title_proposed` (previos + recién creados),
-   usando el `article_id` como identificador. Formato exacto:
+   usando el `article_id` como identificador. Incluí **todos** los IDs devueltos por
+   `list_articles` — no omitás ninguno aunque la lista sea larga. Formato exacto:
 
 ```
 📰 *Notas disponibles — [DD/MM/YYYY HH:MM]*
 
-🏛️ POLÍTICA
 #42 — [título]
 #43 — [título]
-
-💰 ECONOMÍA
 #44 — [título]
 
 @AgentePatriotaBot /aprobar para confirmar todos, o indicá cambios por ID (ej: /modificar 42 [instrucción]).
 ```
-
-Asigná la categoría según el tema del cluster (POLÍTICA, ECONOMÍA, SOCIEDAD, INTERNACIONALES, etc.).
 
 5. Esperá feedback:
    - `/aprobar` → aprobá todos los títulos vigentes y avanzá al Paso 3 para cada uno.

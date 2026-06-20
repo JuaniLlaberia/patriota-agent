@@ -8,6 +8,8 @@ description: >
 # Modificar artículo
 
 Extraé el ID y la instrucción del mensaje (ej: `/modificar 42 cambiar el tono a más formal`).
+Antes de actuar, confirmá al grupo: "Modificando artículo #42". Usá exactamente el número
+del mensaje — nunca inferás ni ajustés el ID.
 
 1. Obtenés el artículo: `mcp_patriota_get_article(id)`.
 2. Detectá qué modificar:

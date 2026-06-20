@@ -12,7 +12,7 @@ Cadencia inicial 45 min (configurable, estimado 30–60). Modelo más barato par
 
 ```bash
 hermes cron create "every 45m" \
-  "Ejecutá un ciclo de monitoreo editorial con la skill editorial-flow: primero corré mcp_patriota_ingest_all para ingestar nuevas fuentes, luego mcp_patriota_cluster_items_semantically para agruparlas automáticamente por similitud semántica, y si se crearon clusters nuevos proponé al grupo los títulos candidatos numerados. No publiques nada; esperá la aprobación del equipo." \
+  "Ejecutá un ciclo de monitoreo editorial con la skill editorial-flow: primero corré mcp_patriota_ingest_all para ingestar nuevas fuentes, luego mcp_patriota_cluster_items_semantically para agruparlas por similitud semántica. Después, con independencia de si se crearon clusters nuevos o no, listá TODOS los artículos en 'title_proposed' y envialos al grupo. No publiques nada; esperá la aprobación del equipo." \
   --name monitoreo \
   --skill editorial-flow \
   --deliver telegram \

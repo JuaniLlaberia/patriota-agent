@@ -7,7 +7,9 @@ description: >
 
 # Aprobar artículos
 
-Extraé los IDs del mensaje (ej: `/aprobar 42 44` → IDs 42 y 44). Sin IDs, procesá todos
+Extraé los IDs del mensaje en orden de aparición (ej: `/aprobar 42 44` → IDs 42 y 44).
+Antes de actuar, confirmá al grupo: "Procesando artículo(s): #42, #44". Usá exactamente
+los números del mensaje — nunca inferás ni ajustés un ID. Sin IDs, procesá todos
 los artículos con `status='title_proposed'`.
 
 ## Obtener artículos a aprobar
