@@ -8,10 +8,10 @@ tick cada 60s. En desarrollo, forzar un ciclo con `hermes cron tick`.
 > autosuficientes. `--workdir ~/.hermes` carga `AGENTS.md` (persona + reglas).
 
 ## 1) Monitoreo continuo (ingesta → clustering semántico → títulos)
-Cadencia inicial 45 min (configurable, estimado 30–60). Modelo más barato para el tick rutinario.
+Cadencia: cada 3 horas. Modelo más barato para el tick rutinario.
 
 ```bash
-hermes cron create "every 45m" \
+hermes cron create "every 3h" \
   "Ejecutá un ciclo de monitoreo editorial con la skill editorial-flow: primero corré mcp_patriota_ingest_all para ingestar nuevas fuentes, luego mcp_patriota_cluster_items_semantically para agruparlas por similitud semántica. Después, con independencia de si se crearon clusters nuevos o no, listá TODOS los artículos en 'title_proposed' y envialos al grupo. No publiques nada; esperá la aprobación del equipo." \
   --name monitoreo \
   --skill editorial-flow \
