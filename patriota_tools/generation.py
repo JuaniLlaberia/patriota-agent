@@ -151,17 +151,39 @@ class ArticleGenerator:
         body_lines = [l for l in body_lines if not _is_cuerpo_header(l)]
 
         return {
-            "titulo": titulo,
-            "bajada": bajada,
-            "volanta": volanta,
+            "titulo": _strip_markdown(titulo),
+            "bajada": _strip_markdown(bajada),
+            "volanta": _strip_markdown(volanta),
             "texto_html": _to_html(body_lines),
         }
+
+
+def _strip_markdown(text: str) -> str:
+    """Remove common markdown formatting, leaving plain text."""
+    # headings: ## Heading → Heading
+    text = re.sub(r"^#{1,6}\s+", "", text)
+    # bold+italic: ***text*** or ___text___
+    text = re.sub(r"\*{3}(.+?)\*{3}", r"\1", text)
+    text = re.sub(r"_{3}(.+?)_{3}", r"\1", text)
+    # bold: **text** or __text__
+    text = re.sub(r"\*{2}(.+?)\*{2}", r"\1", text)
+    text = re.sub(r"_{2}(.+?)_{2}", r"\1", text)
+    # italic: *text* or _text_
+    text = re.sub(r"\*(.+?)\*", r"\1", text)
+    text = re.sub(r"_(.+?)_", r"\1", text)
+    # inline code: `text`
+    text = re.sub(r"`(.+?)`", r"\1", text)
+    # links: [text](url) → text
+    text = re.sub(r"\[(.+?)\]\(.+?\)", r"\1", text)
+    # blockquote prefix
+    text = re.sub(r"^>\s*", "", text)
+    return text.strip()
 
 
 def _to_html(lines: list[str]) -> str:
     parts = []
     for line in lines:
-        s = line.strip()
+        s = _strip_markdown(line.strip())
         if not s:
             continue
         if len(s) < 80 and s[-1] not in ".,:;!?)'\"":
