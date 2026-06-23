@@ -101,11 +101,13 @@ class ArticleGenerator:
             system="Sos el redactor de El Patriota. Escribís en español rioplatense.",
             user=editorial_prompt.rstrip() + f"\n\nFUENTES:\n\n{sources_block}",
             temperature=0.7,
+            max_tokens=4000,
         )
         final_text = self._call(
             system="Sos el editor de El Patriota. Rechequear y humanizar el siguiente borrador.",
             user=recheck_prompt.rstrip() + f"\n\nBORRADOR:\n\n{draft}",
             temperature=0.3,
+            max_tokens=4000,
         )
         return self.parse_output(final_text)
 
