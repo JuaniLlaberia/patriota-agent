@@ -113,27 +113,42 @@ class ArticleGenerator:
 
     def parse_output(self, text: str) -> dict[str, Any]:
         """Extract titulo, bajada, volanta, texto_html from generated text."""
+        _LABEL_RE = re.compile(
+            r"^\*{0,2}(título|title|bajada|volanta|cuerpo|body)\*{0,2}\s*:\s*",
+            re.IGNORECASE,
+        )
+
+        def _strip_label(line: str) -> str:
+            return _LABEL_RE.sub("", line).strip()
+
+        def _is_cuerpo_header(line: str) -> bool:
+            return bool(re.match(r"^\*{0,2}cuerpo\*{0,2}\s*:?\s*$", line, re.IGNORECASE))
+
         lines = text.strip().splitlines()
         non_empty = [l for l in lines if l.strip()]
 
-        titulo = non_empty[0].strip() if non_empty else ""
-        titulo = re.sub(
-            r"^(título|title|TÍTULO)\s*:\s*", "", titulo, flags=re.IGNORECASE
-        ).strip()
+        titulo = _strip_label(non_empty[0]) if non_empty else ""
 
         volanta = ""
         bajada = ""
         body_lines: list[str] = []
 
         for i, line in enumerate(non_empty[1:], 1):
-            if re.match(r"^(volanta|VOLANTA)\s*:", line, re.IGNORECASE):
-                volanta = re.sub(
-                    r"^(volanta|VOLANTA)\s*:\s*", "", line, flags=re.IGNORECASE
-                ).strip()
-            elif not bajada and len(line.strip()) > 60:
-                bajada = line.strip()
-                body_lines = non_empty[i + 1:]
+            stripped = line.strip()
+            clean = _strip_label(stripped)
+            if re.match(r"^\*{0,2}volanta\*{0,2}\s*:", stripped, re.IGNORECASE):
+                volanta = clean
+            elif _is_cuerpo_header(stripped):
+                # "Cuerpo:" is a section header with no inline content — skip it
+                body_lines = [_strip_label(l) for l in non_empty[i + 1:] if l.strip()]
                 break
+            elif not bajada and len(clean) > 60:
+                bajada = clean
+                body_lines = [_strip_label(l) for l in non_empty[i + 1:] if l.strip()]
+                break
+
+        # Remove any stray "Cuerpo:" header that ended up inside body_lines
+        body_lines = [l for l in body_lines if not _is_cuerpo_header(l)]
 
         return {
             "titulo": titulo,

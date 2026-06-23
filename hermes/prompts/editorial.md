@@ -9,11 +9,13 @@
 ## Línea editorial
 - <!-- TODO: definir la línea editorial y la postura del medio sobre temas clave. -->
 
-## Estructura típica de una nota
-1. **Título**: claro, preciso, sin clickbait. Ver criterios obligatorios abajo.
-2. **Bajada**: 1–2 oraciones que resumen el hecho.
-3. **Cuerpo**: pirámide invertida (lo más importante primero), contexto, y cita de fuentes. Sin etiquetas HTML.
-4. **Cierre**: contexto adicional o próximos pasos si corresponde.
+## Estructura del texto generado
+Escribí las secciones en este orden exacto, **sin incluir etiquetas ni encabezados de sección**
+(no escribas "Título:", "Bajada:", "Cuerpo:" ni ninguna variante):
+1. Primera línea: el título exacto aprobado.
+2. Segunda línea: la bajada (1–2 oraciones que resumen el hecho).
+3. Resto: el cuerpo en pirámide invertida (lo más importante primero), contexto, fuentes. Sin etiquetas HTML.
+4. Cierre opcional: contexto adicional o próximos pasos si corresponde.
 
 ## Criterios obligatorios para títulos
 
