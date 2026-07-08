@@ -10,11 +10,13 @@
 #   4. Copies config, persona, skills, and prompts to both the Hermes home and
 #      a root-owned canonical location (/opt/patriota/skills/) that start-gateway.sh
 #      uses to reset skills on every start (prevents self-improvement drift).
-#   5. Resets agent state: removes cron sentinel (forces re-seed with updated prompts)
-#      and schedules a memory wipe on next start (clears stale context).
-#   6. Writes a secrets template to /etc/patriota/env (fill in before starting).
-#   7. Installs and enables the systemd service.
-#   8. Installs a health-check cron that alerts Telegram on service/credit failures.
+#   5. Initializes the DB and its tables if they do not exist (idempotent).
+#   6. Removes the cron sentinel so updated job definitions are re-seeded on next start.
+#   7. Writes a secrets template to /etc/patriota/env (fill in before starting).
+#   8. Installs and enables the systemd service.
+#   9. Installs a health-check cron that alerts Telegram on service/credit failures.
+#
+# This script never wipes DB data or agent memory — run wipe-agent.sh first for that.
 #
 # Usage:
 #   sudo bash deploy/install.sh
@@ -122,28 +124,27 @@ copy_assets() {
     check "AGENTS.md, config.yaml, and skills copied to $HERMES_HOME"
 }
 
-# ── 4b. Reset agent state ─────────────────────────────────────────────────────
-reset_state() {
-    info "Resetting agent state for fresh deploy..."
+# ── 4b. Initialize DB ────────────────────────────────────────────────────────
+init_db() {
+    info "Initializing editorial DB (skipped if already up to date)..."
+    DB_PATH="$HERMES_HOME/patriota.db"
+    # init_db uses CREATE TABLE IF NOT EXISTS and runs migrations idempotently,
+    # so this is safe to call on every deploy — it only creates what is missing.
+    PATRIOTA_DB_PATH="$DB_PATH" "$VENV_DIR/bin/python" -c \
+        "from patriota_tools.storage import db; db.init_db('$DB_PATH')"
+    chown "$INSTALL_USER" "$DB_PATH"
+    check "DB ready at $DB_PATH"
+}
 
-    # Remove sentinel so start-gateway.sh re-creates cron jobs with updated prompts
+# ── 4c. Reset cron sentinel ───────────────────────────────────────────────────
+reset_state() {
+    info "Resetting cron sentinel for fresh deploy..."
+
+    # Remove sentinel so start-gateway.sh re-creates cron jobs with updated
+    # definitions from code on next start. DB and agent memory are never touched
+    # here — use wipe-agent.sh for a full factory reset.
     rm -f "$HERMES_HOME/.cron-seeded"
     check "cron sentinel removed (jobs re-seed on next start)"
-
-    # Create .needs-clean flag: start-gateway.sh will wipe ~/.hermes/memory/ on
-    # next start, clearing stale article IDs and wrong context from prior sessions
-    touch "$HERMES_HOME/.needs-clean"
-    chown "$INSTALL_USER" "$HERMES_HOME/.needs-clean"
-    check "memory wipe scheduled for next gateway start"
-
-    # Clear prompt_versions so server.py re-seeds from the latest .md files on
-    # next startup. Editor customisations are intentionally reset on deploy;
-    # the canonical defaults live in hermes/prompts/*.md (version-controlled).
-    DB_PATH="$HERMES_HOME/patriota.db"
-    if [ -f "$DB_PATH" ]; then
-        sqlite3 "$DB_PATH" "DELETE FROM prompt_versions;"
-        check "prompt_versions cleared (will re-seed from /opt/patriota/prompts/ on next start)"
-    fi
 }
 
 # ── 5. Env file template ──────────────────────────────────────────────────────
@@ -250,6 +251,7 @@ create_user
 install_hermes
 install_tools
 copy_assets
+init_db
 reset_state
 write_env_template
 install_service

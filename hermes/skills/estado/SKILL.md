@@ -18,14 +18,14 @@ Mostrá el resultado en este formato (omití las secciones que estén vacías):
 ```
 📊 *Estado editorial — [DD/MM/YYYY HH:MM]*
 
-📰 ARTÍCULOS PENDIENTES DE TÍTULO
+📰 PENDIENTES DE TÍTULO (title_proposed)
 #42 — [título]
 #43 — [título]
 
-📋 ARTÍCULOS PENDIENTES DE RESUMEN
-#44 — [título] (resumen generado, esperando /aprobar 44)
+📋 PENDIENTES DE APROBACIÓN DE RESUMEN (summary_proposed)
+#44 — [título] → /aprobar 44 para generar borrador
 
-✅ BORRADORES LISTOS PARA PUBLICAR
+✅ BORRADORES LISTOS PARA PUBLICAR (summary_approved)
 #45 — [título] → /publicar 45
 
 🗂 CLUSTERS SIN TÍTULO: N cluster(s) esperando el próximo ciclo editorial.
@@ -34,8 +34,8 @@ Mostrá el resultado en este formato (omití las secciones que estén vacías):
 #12 — [texto del tweet]
 ```
 
-Para clasificar artículos:
-- `status='title_proposed'` con `summary` vacío → pendiente de título
-- `status='title_proposed'` con `summary` poblado → pendiente de resumen
+Para clasificar artículos por status:
+- `status='title_proposed'` → pendiente de aprobación de título
+- `status='summary_proposed'` → resumen generado, pendiente de aprobación del editor
 - `status='summary_approved'` con `body` poblado → borrador listo para /publicar
 - `status='published'` o `'rejected'` → no mostrar

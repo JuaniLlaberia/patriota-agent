@@ -82,21 +82,13 @@ wipe "$HERMES_HOME/.needs-clean"
 check "all Hermes state wiped"
 
 # ── 3. Wipe editorial DB ──────────────────────────────────────────────────────
-info "Wiping editorial DB state..."
+info "Wiping editorial DB..."
 
 if [ -f "$DB_PATH" ]; then
-    sqlite3 "$DB_PATH" "
-DELETE FROM articles;
-DELETE FROM cluster_items;
-DELETE FROM clusters;
-DELETE FROM source_items;
-DELETE FROM tweets;
-DELETE FROM prompt_versions;
-DELETE FROM editor_log;
-"
-    check "all DB tables cleared"
+    rm -f "$DB_PATH"
+    check "DB deleted ($DB_PATH)"
 else
-    echo "  ! $DB_PATH not found — skipping (will be created fresh on next start)"
+    echo "  ! $DB_PATH not found — nothing to delete"
 fi
 
 # ── 4. Restart ────────────────────────────────────────────────────────────────

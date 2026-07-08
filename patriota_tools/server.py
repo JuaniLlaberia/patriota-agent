@@ -141,6 +141,36 @@ def get_schedule_status() -> dict[str, Any]:
     }
 
 
+# ── ingest write queue ───────────────────────────────────────────────────────────
+# All SQLite inserts from ingestion go through a single background worker so
+# writes are never concurrent (SQLite allows only one writer at a time even in
+# WAL mode). The worker stays alive for the lifetime of the MCP process; items
+# enqueued before a tool-call timeout are still written after the call returns.
+
+_ingest_queue: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
+_worker_task: asyncio.Task | None = None
+
+
+async def _db_writer_worker() -> None:
+    while True:
+        item = await _ingest_queue.get()
+        if item is None:  # shutdown sentinel
+            _ingest_queue.task_done()
+            return
+        try:
+            db.upsert_source_item(settings.db_path, item)
+        except Exception:
+            pass  # IntegrityError on dedupe is expected; swallow all to keep draining
+        finally:
+            _ingest_queue.task_done()
+
+
+async def _ensure_writer() -> None:
+    global _worker_task
+    if _worker_task is None or _worker_task.done():
+        _worker_task = asyncio.create_task(_db_writer_worker())
+
+
 # ── ingestion ───────────────────────────────────────────────────────────────────
 
 _TWITTER_CHUNK = 20  # accounts per progress batch
@@ -152,6 +182,7 @@ async def ingest_twitter(ctx: Context) -> dict[str, Any]:
 
     Fetches in batches of 20 with up to 10 parallel requests per batch.
     Emits a progress notification after each batch (~every 3 s for real API).
+    Items are written to DB via the ingest queue (sequential, no lock contention).
     """
     accounts = [a if isinstance(a, str) else a.get("handle") for a in _load_sources().get("x_accounts", [])]
     accounts = [a for a in accounts if a]
@@ -167,8 +198,11 @@ async def ingest_twitter(ctx: Context) -> dict[str, Any]:
         all_items.extend(chunk_items)
         await ctx.report_progress(min(start + _TWITTER_CHUNK, total), total)
 
-    new = sum(1 for it in all_items if db.upsert_source_item(settings.db_path, it))
-    return {"fetched": len(all_items), "new": new, "kind": "tweet", "accounts": total}
+    await _ensure_writer()
+    for it in all_items:
+        await _ingest_queue.put(it)
+    await _ingest_queue.join()
+    return {"fetched": len(all_items), "kind": "tweet", "accounts": total}
 
 
 @mcp.tool()
@@ -194,23 +228,35 @@ def search_twitter(
 
 
 @mcp.tool()
-def ingest_media(outlet_id: str | None = None) -> dict[str, Any]:
-    """Scrape one outlet (by id) or all outlets; store new (deduped) articles."""
+async def ingest_media(outlet_id: str | None = None) -> dict[str, Any]:
+    """Scrape one outlet (by id) or all outlets; store new (deduped) articles.
+
+    Scraping runs in a thread to avoid blocking the event loop. Items are written
+    to DB via the ingest queue (sequential, no lock contention).
+    """
     outlet_ids = [outlet_id] if outlet_id else list(OUTLETS.keys())
-    fetched = new = 0
+    all_items: list[dict[str, Any]] = []
     for oid in outlet_ids:
-        items = scrape_outlet(settings, oid)
-        fetched += len(items)
-        new += sum(1 for it in items if db.upsert_source_item(settings.db_path, it))
-    return {"outlets": outlet_ids, "fetched": fetched, "new": new, "kind": "article"}
+        items = await asyncio.to_thread(scrape_outlet, settings, oid)
+        all_items.extend(items)
+
+    await _ensure_writer()
+    for it in all_items:
+        await _ingest_queue.put(it)
+    await _ingest_queue.join()
+    return {"outlets": outlet_ids, "fetched": len(all_items), "kind": "article"}
 
 
 @mcp.tool()
 async def ingest_all(ctx: Context) -> dict[str, Any]:
-    """Full monitoring tick: tweets from all accounts + articles from all outlets (parallel)."""
+    """Full monitoring tick: fetches tweets and articles in parallel, writes to DB sequentially.
+
+    HTTP fetching (slow) runs concurrently for both sources. All items are written
+    to DB through the shared ingest queue so writes never overlap.
+    """
     tw, md = await asyncio.gather(
         ingest_twitter(ctx),
-        asyncio.to_thread(ingest_media),
+        ingest_media(),
     )
     return {"twitter": tw, "media": md, "at": _now()}
 
@@ -308,7 +354,10 @@ def update_article(
     body: str | None = None,
     status: str | None = None,
 ) -> dict[str, Any]:
-    """Update an article's fields/status (title_proposed→summary_approved→published)."""
+    """Update an article's fields/status.
+
+    Lifecycle: title_proposed → summary_proposed → summary_approved → published | rejected.
+    """
     fields = {k: v for k, v in dict(title=title, summary=summary, body=body, status=status).items() if v is not None}
     db.update_article(settings.db_path, article_id, **fields)
     return {"ok": True, "article_id": article_id, "updated": list(fields)}

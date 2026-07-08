@@ -12,9 +12,10 @@ Antes de actuar, confirmá al grupo: "Modificando artículo #42". Usá exactamen
 del mensaje — nunca inferás ni ajustés el ID.
 
 1. Obtenés el artículo: `mcp_patriota_get_article(id)`.
-2. Detectá qué modificar:
-   - Si `summary` está vacío → modificar el **título**.
-   - Si `summary` está poblado → modificar el **resumen**.
+2. Detectá qué modificar por el campo `status`:
+   - `status == 'title_proposed'` → modificar el **título**.
+   - `status == 'summary_proposed'` → modificar el **resumen**.
+   - Cualquier otro estado → avisá "El artículo #[ID] no está en una etapa modificable (status: [status])" y detenete.
 3. Cargá el prompt editorial: `mcp_patriota_fetch_prompt("editorial")`.
 4. Reescribí según la instrucción del editor, respetando los criterios del prompt:
    - El título DEBE nombrar actor + acción concreta + dato noticioso.

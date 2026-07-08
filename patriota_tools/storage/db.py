@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS articles (
     volanta            TEXT,
     body               TEXT,
     status             TEXT NOT NULL DEFAULT 'title_proposed',
-                       -- title_proposed | summary_approved | published | rejected
+                       -- title_proposed | summary_proposed | summary_approved | published | rejected
     cms_id             TEXT,
     prompt_version_id  INTEGER,
     created_at         TEXT NOT NULL,
