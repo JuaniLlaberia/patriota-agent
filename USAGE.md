@@ -95,14 +95,14 @@ su -l patriota -c "hermes chat"
 
 | Variable | Requerida | Descripción |
 |----------|-----------|-------------|
-| `OPENROUTER_API_KEY` | Sí (para GPT) | Acceso a modelos OpenAI vía OpenRouter |
+| `OPENROUTER_API_KEY` | Sí (clustering) | Validación LLM del clustering semántico, vía OpenRouter |
 | `ANTHROPIC_API_KEY` | Si usás Claude | API key de Anthropic |
 | `HERMES_MODEL` | No | Override de modelo (default: `openai/gpt-4o-mini`) |
 | `TELEGRAM_BOT_TOKEN` | Sí | Token del bot de @BotFather |
 | `TELEGRAM_HOME_CHANNEL` | Sí | chat_id del grupo editorial (int negativo) |
 | `TELEGRAM_ALLOWED_USERS` | Sí | Tu user id de Telegram (ej. `123456789`) |
 | `TWITTERAPI_IO_KEY` | Para Twitter real | API key de twitterapi.io |
-| `OPENAI_API_KEY` | Para embeddings | OpenAI directo — text-embedding-3-small |
+| `OPENAI_API_KEY` | Sí (embeddings + generación) | OpenAI directo — text-embedding-3-small y generación de borradores (GPT-4o-mini) |
 | `CMS_API_URL_BASE` | Para publicar | URL base del CMS (ej. `https://api.elpatriota.com`) |
 | `CMS_CLIENT_ID` | Para publicar | OAuth client ID del CMS |
 | `CMS_CLIENT_SECRET` | Para publicar | OAuth client secret del CMS |
@@ -120,7 +120,11 @@ Las variables de rutas (`HERMES_HOME`, `PATRIOTA_MCP_COMMAND`, etc.) las escribe
 **sobre [Hermes Agent](https://hermes-agent.nousresearch.com/)** (Nous Research, MIT). Hermes
 aporta el loop, memoria, skills, cron y Telegram; nosotros aportamos las _capacidades de
 dominio_ como un servidor MCP (`patriota-tools`) + skills + cron.
-LLM = OpenAI vía OpenRouter (default: `gpt-4o-mini`; override con `HERMES_MODEL`). Opera en español rioplatense, con `/aprobar` humano antes de publicar.
+LLM del agente = OpenAI vía OpenRouter (default: `gpt-4o-mini`; override con `HERMES_MODEL`).
+La generación de borradores de artículos llama a OpenAI directo (no OpenRouter) para tener
+un pool de rate limit dedicado; el clustering semántico sigue validando vía OpenRouter.
+Opera en español rioplatense, con `/aprobar` (título → resumen) y `/publicar` (resumen →
+borrador + CMS) humanos en cada etapa.
 
 ### ✅ Funciona hoy
 

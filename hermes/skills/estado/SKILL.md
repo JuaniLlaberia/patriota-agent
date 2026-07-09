@@ -23,10 +23,10 @@ Mostrá el resultado en este formato (omití las secciones que estén vacías):
 #43 — [título]
 
 📋 PENDIENTES DE APROBACIÓN DE RESUMEN (summary_proposed)
-#44 — [título] → /aprobar 44 para generar borrador
+#44 — [título] → /publicar 44 para generar el borrador y publicar
 
-✅ BORRADORES LISTOS PARA PUBLICAR (summary_approved)
-#45 — [título] → /publicar 45
+⚠️ BORRADORES CON PUBLICACIÓN PENDIENTE DE REINTENTO (summary_approved)
+#45 — [título] → /publicar 45 (falló un intento previo de publicar al CMS)
 
 🗂 CLUSTERS SIN TÍTULO: N cluster(s) esperando el próximo ciclo editorial.
 
@@ -35,7 +35,8 @@ Mostrá el resultado en este formato (omití las secciones que estén vacías):
 ```
 
 Para clasificar artículos por status:
-- `status='title_proposed'` → pendiente de aprobación de título
-- `status='summary_proposed'` → resumen generado, pendiente de aprobación del editor
-- `status='summary_approved'` con `body` poblado → borrador listo para /publicar
+- `status='title_proposed'` → pendiente de aprobación de título (`/aprobar`)
+- `status='summary_proposed'` → resumen generado, pendiente de `/publicar`
+- `status='summary_approved'` → estado de reintento: un `/publicar` previo generó el
+  borrador pero falló al postear al CMS; el editor puede reintentar con `/publicar`
 - `status='published'` o `'rejected'` → no mostrar

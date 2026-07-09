@@ -25,15 +25,17 @@ title_proposed
     └─ @AgentePatriotaBot /descartar [N]              → rejected
 
 summary_proposed
-    ├─ @AgentePatriotaBot /aprobar [N]               → summary_approved → generá borrador
+    ├─ @AgentePatriotaBot /publicar [N]              → summary_approved → genera borrador → publica al CMS → published (CMS ID: NNNN)
     ├─ @AgentePatriotaBot /modificar [N] [instrucción] → ajustá resumen y re-enviá
     └─ @AgentePatriotaBot /descartar [N]              → rejected
-
-summary_approved  (borrador en body)
-    └─ @AgentePatriotaBot /publicar [N]              → published (CMS ID: NNNN)
 ```
 
-Estados terminales: `published`, `rejected`, `ERROR_CMS`.
+`summary_approved` es un estado interno de tránsito/reintento dentro de `/publicar`
+(`mcp_patriota_publish_article_to_cms`) — no es un paso donde el editor espera antes de
+actuar; solo aparece visible si un intento previo de publicar falló después de generar
+el borrador (ver skill `publicar`).
+
+Estados terminales: `published`, `rejected`.
 
 ---
 
@@ -110,11 +112,11 @@ Fuentes ([cantidad]):
 • [@handle o medio] — "[fragmento del título]" → [url]
 • ...
 
-@AgentePatriotaBot /aprobar [N] para generar el borrador, o pedí cambios.
+@AgentePatriotaBot /publicar [N] para generar el borrador y publicar al CMS, o pedí cambios.
 ```
 
 5. Esperá feedback:
-   - `/aprobar [N]` → `mcp_patriota_update_article(article_id, status="summary_approved")` y avanzá al Paso 4.
+   - `/publicar [N]` → avanzá al Paso 4.
    - `/modificar [N] [instrucción]` → ajustá el resumen y re-enviá (el status sigue en `summary_proposed`).
    - `/descartar [N]` → marcá como rechazado.
 
@@ -122,12 +124,11 @@ Fuentes ([cantidad]):
 
 ## Paso 4 — Generación y publicación
 
-Para cada artículo en `summary_approved`:
-
-1. Generá el borrador: `mcp_patriota_generate_article_draft(article_id)`.
-2. Mostrá al grupo el título y la bajada generados para revisión rápida.
-3. Publicá: `mcp_patriota_publish_article_to_cms(article_id)`.
-4. Confirmá al grupo con el `cms_id` y el formato de confirmación de publicación.
+Para cada artículo en `summary_proposed` cuyo resumen fue aprobado con `/publicar [N]`,
+usá la skill `publicar`: una única llamada a `mcp_patriota_publish_article_to_cms(article_id)`
+avanza el estado, genera el borrador y publica al CMS. No llames herramientas de
+generación por separado — la herramienta ya hace los tres pasos de forma atómica.
+Confirmá al grupo con el título, la bajada y el `cms_id` devueltos.
 
 ---
 
@@ -135,8 +136,9 @@ Para cada artículo en `summary_approved`:
 
 | Comando | Acción |
 |---|---|
-| `@AgentePatriotaBot /aprobar` | Aprueba todos los ítems pendientes del estado actual |
-| `@AgentePatriotaBot /aprobar 42 44` | Aprueba los artículos con esos IDs (espacio entre IDs) |
+| `@AgentePatriotaBot /aprobar` | Aprueba todos los títulos pendientes (`title_proposed`) y genera sus resúmenes |
+| `@AgentePatriotaBot /aprobar 42 44` | Aprueba los títulos de esos IDs (espacio entre IDs) |
+| `@AgentePatriotaBot /publicar 42` | Aprueba el resumen del #42, genera el borrador y lo publica al CMS |
 | `@AgentePatriotaBot /modificar 43 [instrucción]` | Modifica el artículo #43 con la instrucción dada |
 | `@AgentePatriotaBot /modificar 43,45 [instrucción]` | Modifica múltiples artículos (coma sin espacio) |
 | `@AgentePatriotaBot /descartar 43` | Descarta el artículo #43 del ciclo actual |
@@ -157,5 +159,5 @@ Para cada artículo en `summary_approved`:
 - Registrá los mensajes relevantes del editor con `mcp_patriota_log_editor`.
 - Si el editor rechaza algo, usá `status="rejected"` y explicá brevemente.
 - Nunca inventes fuentes ni datos: usá solo lo que viene en los ítems del cluster.
-- Nunca publiques al CMS sin `/aprobar` explícito del editor.
+- Nunca publiques al CMS sin `/publicar` explícito del editor.
 - El `/estado` muestra `mcp_patriota_list_articles()` + `mcp_patriota_list_clusters()` en formato resumido.

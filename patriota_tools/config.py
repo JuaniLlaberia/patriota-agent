@@ -51,9 +51,10 @@ class Settings(BaseSettings):
     # External services (ignored while use_mocks is true).
     twitterapi_io_key: str | None = Field(default=None, alias="TWITTERAPI_IO_KEY")
 
-    # OpenAI — embeddings (text-embedding-3-small, direct API — OpenRouter doesn't support embeddings).
+    # OpenAI direct API — embeddings (text-embedding-3-small) and article draft
+    # generation (GPT-4o-mini), both called directly for a dedicated rate-limit pool.
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
-    # OpenRouter — article generation via GPT-4o-mini.
+    # OpenRouter — clustering's LLM validation step only.
     openrouter_api_key: str | None = Field(default=None, alias="OPENROUTER_API_KEY")
 
     # CMS OAuth v1.1

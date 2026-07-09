@@ -356,7 +356,8 @@ def update_article(
 ) -> dict[str, Any]:
     """Update an article's fields/status.
 
-    Lifecycle: title_proposed → summary_proposed → summary_approved → published | rejected.
+    Lifecycle: title_proposed → summary_proposed → (summary_approved, internal) → published | rejected.
+    summary_approved is set automatically by publish_article_to_cms — don't set it manually.
     """
     fields = {k: v for k, v in dict(title=title, summary=summary, body=body, status=status).items() if v is not None}
     db.update_article(settings.db_path, article_id, **fields)
@@ -376,23 +377,12 @@ def list_articles(status: str | None = None) -> list[dict[str, Any]]:
     return db.list_articles(settings.db_path, status=status)
 
 
-@mcp.tool()
-def generate_article_draft(article_id: int) -> dict[str, Any]:
-    """Generate the full article draft for an article in 'summary_approved' state.
+def _generate_draft(article: dict[str, Any]) -> dict[str, Any]:
+    """Run the two-prompt generation pipeline for an article and persist the result.
 
-    Runs the two-prompt pipeline (generation → recheck) using the approved title and
-    cluster sources. Updates the article record with titulo, bajada, volanta, body (HTML).
-    Requires OPENROUTER_API_KEY.
+    Mutates `article` in place with the generated fields so the caller can use them
+    immediately (e.g. to build the CMS payload) without a second DB read.
     """
-    if not settings.openrouter_api_key:
-        return {"error": "OPENROUTER_API_KEY no configurado"}
-
-    article = db.get_article(settings.db_path, article_id)
-    if not article:
-        return {"error": f"artículo {article_id} no existe"}
-    if article.get("status") != "summary_approved":
-        return {"error": f"el artículo debe estar en summary_approved (estado actual: {article.get('status')})"}
-
     cluster = db.get_cluster(settings.db_path, article["cluster_id"]) if article.get("cluster_id") else None
     items = (cluster or {}).get("items", [])
     if not items:
@@ -406,31 +396,61 @@ def generate_article_draft(article_id: int) -> dict[str, Any]:
     # Pass the approved title as a hard constraint for the LLM.
     full_prompt = f"TÍTULO APROBADO (usalo exactamente): {article['title']}\n\n{editorial_prompt}"
 
-    generator = ArticleGenerator(settings.openrouter_api_key)
+    generator = ArticleGenerator(settings.openai_api_key)
     generated = generator.generate(items, full_prompt, recheck_prompt)
 
     db.update_article(
-        settings.db_path, article_id,
+        settings.db_path, article["id"],
         title=generated["titulo"] or article["title"],
         bajada=generated["bajada"],
         volanta=generated["volanta"],
         body=generated["texto_html"],
     )
-    return {"ok": True, "article_id": article_id, "generated": generated}
+    article.update(
+        title=generated["titulo"] or article["title"],
+        bajada=generated["bajada"],
+        volanta=generated["volanta"],
+        body=generated["texto_html"],
+    )
+    return {"ok": True}
 
 
 @mcp.tool()
 def publish_article_to_cms(article_id: int) -> dict[str, Any]:
-    """Publish an approved article to the CMS as 'borrador' (visible=0).
+    """Approve the summary, generate the full draft, and publish it to the CMS — one atomic step.
 
-    Only call after the editor has approved the full draft. Posts to the CMS using
-    the v1.1 API (OAuth + multipart/form-data) and marks the article 'published'.
+    Call this for /publicar on an article in 'summary_proposed'. It advances the article
+    to 'summary_approved', runs the two-prompt draft pipeline (generation → recheck) against
+    the approved title and cluster sources, then posts the result to the CMS as 'borrador'
+    (visible=0) and marks the article 'published'.
+
+    Retry-safe: if a previous call generated the draft but the CMS post failed, the article
+    is left in 'summary_approved' with its body already saved — calling this again skips
+    regeneration and just retries the CMS post. Requires OPENAI_API_KEY.
     """
     article = db.get_article(settings.db_path, article_id)
     if not article:
         return {"error": f"artículo {article_id} no existe"}
+
+    status = article.get("status")
+    if status not in ("summary_proposed", "summary_approved"):
+        return {
+            "error": (
+                f"el artículo debe estar en summary_proposed o summary_approved para publicar "
+                f"(estado actual: {status})"
+            )
+        }
+
+    if status == "summary_proposed":
+        db.update_article(settings.db_path, article_id, status="summary_approved")
+        article["status"] = "summary_approved"
+
     if not article.get("body"):
-        return {"error": "el artículo no tiene cuerpo redactado — ejecutá generate_article_draft primero"}
+        if not settings.openai_api_key:
+            return {"error": "OPENAI_API_KEY no configurado"}
+        gen_result = _generate_draft(article)
+        if "error" in gen_result:
+            return gen_result
 
     cluster = db.get_cluster(settings.db_path, article["cluster_id"]) if article.get("cluster_id") else None
     cluster_topic = (cluster or {}).get("topic", "")
@@ -448,13 +468,28 @@ def publish_article_to_cms(article_id: int) -> dict[str, Any]:
         "grupo": str(article.get("cluster_id") or ""),
         "grupo_tema": cluster_topic,
     }
-    result = get_cms(settings).publish_draft(payload)
+    try:
+        result = get_cms(settings).publish_draft(payload)
+    except Exception as exc:
+        return {
+            "error": (
+                f"fallo al publicar en el CMS: {exc}. El borrador quedó guardado "
+                f"(estado summary_approved) — reintentá con /publicar."
+            )
+        }
+
     db.update_article(
         settings.db_path, article_id,
         status="published", cms_id=result.get("cms_id"),
         prompt_version_id=prompt_version_id,
     )
-    return {"ok": True, "article_id": article_id, "cms": result}
+    return {
+        "ok": True,
+        "article_id": article_id,
+        "titulo": article["title"],
+        "bajada": article.get("bajada"),
+        "cms": result,
+    }
 
 
 # ── tweets ───────────────────────────────────────────────────────────────────────

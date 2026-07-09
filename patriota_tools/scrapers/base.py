@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import logging
-import re
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import Any
 
 from pydantic import BaseModel
+
+from ..textclean import clean_article_text
 
 logger = logging.getLogger(__name__)
 
@@ -91,8 +92,7 @@ class RSSFeedScraper(Scraper):
             body = content[0].get("value", "")
         elif entry.get("summary"):
             body = entry.summary or ""
-        body = re.sub(r"<[^>]+>", " ", body)
-        body = re.sub(r"\s+", " ", body).strip()
+        body = clean_article_text(body)
 
         # Date
         t = entry.get("published_parsed") or entry.get("updated_parsed")

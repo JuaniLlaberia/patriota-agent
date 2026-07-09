@@ -2,7 +2,9 @@
 
 Prompt 1 (temperature 0.7): generates a full article draft from source items.
 Prompt 2 (temperature 0.3): re-checks and humanises the draft.
-Both use GPT-4o-mini via OpenRouter.
+Both call GPT-4o-mini directly against the OpenAI API (not via OpenRouter) — the
+direct API has a dedicated per-org rate limit pool instead of OpenRouter's shared one,
+which is what article generation was hitting.
 """
 
 from __future__ import annotations
@@ -10,23 +12,23 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 from typing import Any
 
 import openai
 
+from .textclean import clean_article_text
+
 logger = logging.getLogger(__name__)
 
-_DEFAULT_MODEL = "openai/gpt-4o-mini"
+_DEFAULT_MODEL = "gpt-4o-mini"
 
 
 class ArticleGenerator:
     """Generate article drafts via the two-prompt pipeline."""
 
-    def __init__(self, openrouter_api_key: str, model: str = _DEFAULT_MODEL) -> None:
-        self._client = openai.OpenAI(
-            api_key=openrouter_api_key,
-            base_url="https://openrouter.ai/api/v1",
-        )
+    def __init__(self, openai_api_key: str, model: str = _DEFAULT_MODEL) -> None:
+        self._client = openai.OpenAI(api_key=openai_api_key)
         self._model = model
 
     # ── Source context builder ───────────────────────────────────────────────
@@ -51,7 +53,7 @@ class ArticleGenerator:
             eng_str = f" ({score:,} likes)" if score else ""
             source = item.get("source") or "fuente desconocida"
             date = item.get("published_at") or item.get("ingested_at") or ""
-            body_preview = (item.get("body") or "")[:400]
+            body_preview = clean_article_text(item.get("body"))[:400]
             lines.append(
                 f"FUENTE {i} — {source}{eng_str} — {date}\n"
                 f"{item.get('title') or ''}\n"
@@ -69,19 +71,29 @@ class ArticleGenerator:
         temperature: float,
         max_tokens: int = 2000,
     ) -> str:
-        for attempt in range(2):
+        messages = [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ]
+        delay = 5.0
+        for attempt in range(4):
             try:
                 resp = self._client.chat.completions.create(
                     model=self._model,
-                    messages=[
-                        {"role": "system", "content": system},
-                        {"role": "user", "content": user},
-                    ],
+                    messages=messages,
                     temperature=temperature,
                     max_tokens=max_tokens,
                     timeout=30,
                 )
                 return resp.choices[0].message.content or ""
+            except openai.RateLimitError as exc:
+                if attempt == 3:
+                    raise
+                logger.warning(
+                    "Rate limited (attempt %d/4); backing off %.0fs: %s", attempt + 1, delay, exc
+                )
+                time.sleep(delay)
+                delay *= 3
             except Exception as exc:
                 if attempt == 0:
                     logger.warning("LLM generation call failed (retrying): %s", exc)
