@@ -22,6 +22,16 @@ generation:
 memory_enabled: true
 user_profile_enabled: true
 
+# ── Session freshness ──────────────────────────────────────────────────────────
+# Reset the gateway conversation once a day so accumulated context (stale article
+# ID lists) doesn't build up and confuse the model. at_hour is LOCAL server time;
+# the VPS runs America/Argentina/Buenos_Aires, so 4 = 04:00 ART (editorial dead
+# window). Persistent memory and the editorial DB are preserved across a reset;
+# only the conversation transcript is cleared.
+session_reset:
+  mode: daily
+  at_hour: 4
+
 agent:
   tool_use_enforcement: true   # force structured tool calls on GPT models (not needed for Anthropic)
 

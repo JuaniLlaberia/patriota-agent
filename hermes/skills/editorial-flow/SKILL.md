@@ -35,7 +35,12 @@ summary_proposed
 actuar; solo aparece visible si un intento previo de publicar falló después de generar
 el borrador (ver skill `publicar`).
 
-Estados terminales: `published`, `rejected`.
+Estados terminales: `published`, `rejected`, `expired`.
+
+`expired` lo asigna automáticamente `mcp_patriota_expire_stale_articles` al inicio de cada
+ciclo de monitoreo (solo en horario editorial): retira los títulos en `title_proposed` que
+el equipo nunca aprobó tras varias horas, para que no se acumulen en el listado. No se
+borran — quedan registrados. No los re-propongas ni los proceses.
 
 ---
 

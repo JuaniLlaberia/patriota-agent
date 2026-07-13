@@ -13,5 +13,8 @@ REGLAS ESTRICTAS:
 - No cambiar el ángulo editorial aprobado por el equipo
 - El texto final debe ser publicable sin edición adicional
 - Mantener la estructura: título → bajada → cuerpo con subtítulos si corresponde
+- NO acortar ni resumir el borrador: conservá (o ampliá) su extensión, todos sus párrafos
+  y todos los datos, cifras y declaraciones. El objetivo es humanizar y corregir, no condensar.
+- Separá cada párrafo del cuerpo con una línea en blanco.
 
 Devolvé el texto final completo, sin comentarios ni explicaciones de los cambios realizados.

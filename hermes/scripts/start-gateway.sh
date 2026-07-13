@@ -66,7 +66,7 @@ else
     # Ciclo editorial cada 3 horas: ingesta → clustering → propuesta (solo en horario editorial)
     _seed_cron monitoreo \
         "0 */3 * * *" \
-        "Ejecutá el ciclo de monitoreo editorial con la skill editorial-flow: (1) llamá mcp_patriota_ingest_all para ingestar nuevas fuentes; (2) llamá mcp_patriota_cluster_items_semantically para agrupar semánticamente; (3) llamá mcp_patriota_get_schedule_status — si in_working_hours es false avisá al grupo con un mensaje breve cuántos clusters nuevos se acumularon y terminá sin proponer títulos; si in_working_hours es true ejecutá el flujo completo de la skill listando TODOS los clusters pendientes (no solo los del ciclo actual) y proponé títulos para los que aún no tienen artículo. No publiques nada; esperá la aprobación del equipo." \
+        "Ejecutá el ciclo de monitoreo editorial con la skill editorial-flow: (1) llamá mcp_patriota_ingest_all para ingestar nuevas fuentes; (2) llamá mcp_patriota_cluster_items_semantically para agrupar semánticamente; (3) llamá mcp_patriota_get_schedule_status — si in_working_hours es false avisá al grupo con un mensaje breve cuántos clusters nuevos se acumularon y terminá sin proponer títulos; si in_working_hours es true, primero llamá mcp_patriota_expire_stale_articles para retirar los títulos viejos que el equipo nunca aprobó, y luego ejecutá el flujo completo de la skill listando TODOS los clusters pendientes (no solo los del ciclo actual) y proponé títulos para los que aún no tienen artículo. No publiques nada; esperá la aprobación del equipo." \
         --skill editorial-flow \
         --deliver telegram \
         --workdir "$HERMES_WORKDIR"

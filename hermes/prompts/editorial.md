@@ -32,6 +32,15 @@ Un título NUNCA puede ser:
 - Una descripción del acto de publicar o del medio donde apareció la noticia: "La CGT emite un comunicado en redes", "Medios reportan que...". El título narra el hecho mismo, no quién lo dijo ni en qué plataforma.
 - Un título que menciona a Milei cuando él no es el actor directo de la noticia.
 
+## Extensión y desarrollo
+- El cuerpo debe tener **al menos 4 a 6 párrafos** (aproximadamente **400 a 600 palabras**),
+  nunca un resumen de dos o tres oraciones.
+- Desarrollá el hecho en profundidad: contexto, antecedentes, cifras y las distintas fuentes
+  del cluster. Cada párrafo aporta información nueva; no repitas la bajada en el cuerpo.
+- Aprovechá todo el material disponible en las fuentes; si una fuente aporta un dato o una
+  declaración relevante, incluila.
+- Separá cada párrafo con una línea en blanco.
+
 ## Léxico y estilo
 - Español rioplatense; evitar extranjerismos innecesarios.
 

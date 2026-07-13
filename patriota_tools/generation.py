@@ -53,7 +53,7 @@ class ArticleGenerator:
             eng_str = f" ({score:,} likes)" if score else ""
             source = item.get("source") or "fuente desconocida"
             date = item.get("published_at") or item.get("ingested_at") or ""
-            body_preview = clean_article_text(item.get("body"))[:400]
+            body_preview = clean_article_text(item.get("body"))[:1800]
             lines.append(
                 f"FUENTE {i} — {source}{eng_str} — {date}\n"
                 f"{item.get('title') or ''}\n"
@@ -107,7 +107,7 @@ class ArticleGenerator:
         editorial_prompt: str,
         recheck_prompt: str,
     ) -> dict[str, Any]:
-        """Run the two-prompt pipeline. Returns {titulo, bajada, volanta, texto_html}."""
+        """Run the two-prompt pipeline. Returns {titulo, bajada, volanta, body_text}."""
         sources_block = self.build_sources_context(items)
         draft = self._call(
             system="Sos el redactor de El Patriota. Escribís en español rioplatense.",
@@ -126,7 +126,13 @@ class ArticleGenerator:
     # ── Output parser ────────────────────────────────────────────────────────
 
     def parse_output(self, text: str) -> dict[str, Any]:
-        """Extract titulo, bajada, volanta, texto_html from generated text."""
+        """Extract titulo, bajada, volanta, body_text from generated text.
+
+        Follows the structure the editorial prompt mandates — line 1: título,
+        line 2: bajada, resto: cuerpo — instead of guessing by line length (which
+        dropped short bajadas and swallowed the first body paragraph). Optional
+        'Volanta:' / 'Cuerpo:' label lines are tolerated but not required.
+        """
         _LABEL_RE = re.compile(
             r"^\*{0,2}(título|title|bajada|volanta|cuerpo|body)\*{0,2}\s*:\s*",
             re.IGNORECASE,
@@ -138,37 +144,32 @@ class ArticleGenerator:
         def _is_cuerpo_header(line: str) -> bool:
             return bool(re.match(r"^\*{0,2}cuerpo\*{0,2}\s*:?\s*$", line, re.IGNORECASE))
 
-        lines = text.strip().splitlines()
-        non_empty = [l for l in lines if l.strip()]
+        non_empty = [l.strip() for l in text.strip().splitlines() if l.strip()]
+        if not non_empty:
+            return {"titulo": "", "bajada": "", "volanta": "", "body_text": ""}
 
-        titulo = _strip_label(non_empty[0]) if non_empty else ""
+        titulo = _strip_label(non_empty[0])
+        rest = non_empty[1:]
 
+        # Optional explicit volanta line (the prompt omits it, but tolerate it).
         volanta = ""
-        bajada = ""
-        body_lines: list[str] = []
+        if rest and re.match(r"^\*{0,2}volanta\*{0,2}\s*:", rest[0], re.IGNORECASE):
+            volanta = _strip_label(rest[0])
+            rest = rest[1:]
 
-        for i, line in enumerate(non_empty[1:], 1):
-            stripped = line.strip()
-            clean = _strip_label(stripped)
-            if re.match(r"^\*{0,2}volanta\*{0,2}\s*:", stripped, re.IGNORECASE):
-                volanta = clean
-            elif _is_cuerpo_header(stripped):
-                # "Cuerpo:" is a section header with no inline content — skip it
-                body_lines = [_strip_label(l) for l in non_empty[i + 1:] if l.strip()]
-                break
-            elif not bajada and len(clean) > 60:
-                bajada = clean
-                body_lines = [_strip_label(l) for l in non_empty[i + 1:] if l.strip()]
-                break
+        # Skip any stray 'Cuerpo:' header sitting where the bajada should be.
+        while rest and _is_cuerpo_header(rest[0]):
+            rest = rest[1:]
 
-        # Remove any stray "Cuerpo:" header that ended up inside body_lines
-        body_lines = [l for l in body_lines if not _is_cuerpo_header(l)]
+        # Line 2 is the bajada; everything after it is the body.
+        bajada = _strip_label(rest[0]) if rest else ""
+        body_lines = [_strip_label(l) for l in rest[1:] if not _is_cuerpo_header(l)]
 
         return {
             "titulo": _strip_markdown(titulo),
             "bajada": _strip_markdown(bajada),
             "volanta": _strip_markdown(volanta),
-            "texto_html": _to_html(body_lines),
+            "body_text": _to_body_text(body_lines),
         }
 
 
@@ -194,14 +195,12 @@ def _strip_markdown(text: str) -> str:
     return text.strip()
 
 
-def _to_html(lines: list[str]) -> str:
-    parts = []
-    for line in lines:
-        s = _strip_markdown(line.strip())
-        if not s:
-            continue
-        if len(s) < 80 and s[-1] not in ".,:;!?)'\"":
-            parts.append(f"<h2>{s}</h2>")
-        else:
-            parts.append(f"<p>{s}</p>")
-    return "\n".join(parts)
+def _to_body_text(lines: list[str]) -> str:
+    """Join paragraphs as plain text separated by a blank line.
+
+    The CMS body field preserves literal newlines (markdown-ish / nl2br textarea),
+    so a blank line between paragraphs is what renders as a paragraph break there —
+    inline <p> tags were being collapsed. Kept plain so the DB stores plain text too.
+    """
+    parts = [s for line in lines if (s := _strip_markdown(line.strip()))]
+    return "\n\n".join(parts)

@@ -12,7 +12,7 @@ import json
 import os
 import time
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -207,13 +207,13 @@ class RealCMS(CMSClient):
         id_seccion = self._map_seccion_id(payload.get("grupo_tema", ""), secciones)
 
         form: dict[str, Any] = {
-            "fecha": payload.get("fecha") or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+            "fecha": payload.get("fecha") or datetime.now(timezone(timedelta(hours=-3))).strftime("%Y-%m-%d %H:%M:%S"),
             "titulo": payload.get("titulo", ""),
             "autor": payload.get("autor", "El Patriota"),
             "visible": "0",
             "destacada": "0",
         }
-        for optional in ("bajada", "texto", "volanta", "grupo"):
+        for optional in ("bajada", "texto", "volanta"):
             if payload.get(optional):
                 form[optional] = payload[optional]
         if id_seccion:

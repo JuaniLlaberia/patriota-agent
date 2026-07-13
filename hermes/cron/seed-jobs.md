@@ -12,7 +12,7 @@ Cadencia: cada 3 horas. Modelo más barato para el tick rutinario.
 
 ```bash
 hermes cron create "every 3h" \
-  "Ejecutá un ciclo de monitoreo editorial con la skill editorial-flow: primero corré mcp_patriota_ingest_all para ingestar nuevas fuentes, luego mcp_patriota_cluster_items_semantically para agruparlas por similitud semántica. Después, con independencia de si se crearon clusters nuevos o no, listá TODOS los artículos en 'title_proposed' y envialos al grupo. No publiques nada; esperá la aprobación del equipo." \
+  "Ejecutá un ciclo de monitoreo editorial con la skill editorial-flow: primero corré mcp_patriota_ingest_all para ingestar nuevas fuentes, luego mcp_patriota_cluster_items_semantically para agruparlas por similitud semántica. Si estás en horario editorial (mcp_patriota_get_schedule_status), llamá mcp_patriota_expire_stale_articles para retirar los títulos viejos sin aprobar. Después, con independencia de si se crearon clusters nuevos o no, listá TODOS los artículos en 'title_proposed' y envialos al grupo. No publiques nada; esperá la aprobación del equipo." \
   --name monitoreo \
   --skill editorial-flow \
   --deliver telegram \

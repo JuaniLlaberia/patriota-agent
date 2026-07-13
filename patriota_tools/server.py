@@ -54,8 +54,17 @@ def _load_sources() -> dict[str, Any]:
     return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
 
 
+# Argentina has no DST — a fixed UTC-3 offset is the local Buenos Aires time.
+_BUE_TZ = timezone(timedelta(hours=-3))
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _now_bue_str() -> str:
+    """Current Buenos Aires local time as 'YYYY-MM-DD HH:MM:SS' (for CMS 'fecha')."""
+    return datetime.now(_BUE_TZ).strftime("%Y-%m-%d %H:%M:%S")
 
 
 # ── meta / config ────────────────────────────────────────────────────────────────
@@ -116,8 +125,7 @@ def get_schedule_status() -> dict[str, Any]:
     prompt = db.get_latest_prompt(settings.db_path, "working_hours")
     window = (prompt or {}).get("content", "07:00-00:00").strip().splitlines()[0].strip()
 
-    BUE_TZ = timezone(timedelta(hours=-3))
-    now_bue = datetime.now(BUE_TZ)
+    now_bue = datetime.now(_BUE_TZ)
     now_minutes = now_bue.hour * 60 + now_bue.minute
 
     try:
@@ -377,6 +385,19 @@ def list_articles(status: str | None = None) -> list[dict[str, Any]]:
     return db.list_articles(settings.db_path, status=status)
 
 
+@mcp.tool()
+def expire_stale_articles(max_age_hours: int = 12) -> dict[str, Any]:
+    """Retire proposed titles the editors never acted on (status → 'expired').
+
+    Flips any article left in 'title_proposed' for more than max_age_hours (default 12)
+    to the terminal 'expired' status, so old proposals stop reappearing in the digest and
+    article IDs stop piling up. Rows are kept (not deleted) for traceability. Call this at
+    the START of a monitoreo tick — during working hours only — before listing titles.
+    """
+    ids = db.expire_stale_articles(settings.db_path, max_age_hours)
+    return {"expired": len(ids), "article_ids": ids}
+
+
 def _generate_draft(article: dict[str, Any]) -> dict[str, Any]:
     """Run the two-prompt generation pipeline for an article and persist the result.
 
@@ -404,13 +425,13 @@ def _generate_draft(article: dict[str, Any]) -> dict[str, Any]:
         title=generated["titulo"] or article["title"],
         bajada=generated["bajada"],
         volanta=generated["volanta"],
-        body=generated["texto_html"],
+        body=generated["body_text"],
     )
     article.update(
         title=generated["titulo"] or article["title"],
         bajada=generated["bajada"],
         volanta=generated["volanta"],
-        body=generated["texto_html"],
+        body=generated["body_text"],
     )
     return {"ok": True}
 
@@ -459,13 +480,12 @@ def publish_article_to_cms(article_id: int) -> dict[str, Any]:
     prompt_version_id = prompt["id"] if prompt else None
 
     payload = {
-        "fecha": _now().replace("T", " ")[:19],
+        "fecha": _now_bue_str(),
         "titulo": article["title"],
         "bajada": article.get("bajada") or article.get("summary") or "",
         "texto": article.get("body") or "",
         "autor": "El Patriota",
         "volanta": article.get("volanta") or "",
-        "grupo": str(article.get("cluster_id") or ""),
         "grupo_tema": cluster_topic,
     }
     try:

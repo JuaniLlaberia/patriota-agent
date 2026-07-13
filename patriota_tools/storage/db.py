@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS articles (
     volanta            TEXT,
     body               TEXT,
     status             TEXT NOT NULL DEFAULT 'title_proposed',
-                       -- title_proposed | summary_proposed | summary_approved | published | rejected
+                       -- title_proposed | summary_proposed | summary_approved | published | rejected | expired
     cms_id             TEXT,
     prompt_version_id  INTEGER,
     created_at         TEXT NOT NULL,
@@ -275,6 +275,32 @@ def list_articles(db_path: str, status: str | None = None) -> list[dict[str, Any
     q += " ORDER BY updated_at DESC"
     with get_conn(db_path) as conn:
         return _rows(conn.execute(q, params))
+
+
+def expire_stale_articles(db_path: str, max_age_hours: int) -> list[int]:
+    """Retire proposed titles the editors never acted on.
+
+    Flips articles left in 'title_proposed' for longer than ``max_age_hours`` to the
+    terminal 'expired' status. Only touches 'title_proposed' — never an article the
+    editor already engaged with. Rows are kept (status change only, no delete) for
+    traceability. Returns the ids that were expired. created_at is stored as UTC ISO,
+    so a lexicographic comparison against a same-format cutoff is correct.
+    """
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=max_age_hours)).isoformat()
+    with get_conn(db_path) as conn:
+        ids = [
+            int(r["id"]) for r in conn.execute(
+                "SELECT id FROM articles WHERE status = 'title_proposed' AND created_at < ?",
+                (cutoff,),
+            )
+        ]
+        if ids:
+            conn.execute(
+                "UPDATE articles SET status = 'expired', updated_at = ? "
+                "WHERE status = 'title_proposed' AND created_at < ?",
+                (_now(), cutoff),
+            )
+        return ids
 
 
 # ── tweets ──────────────────────────────────────────────────────────────────────
