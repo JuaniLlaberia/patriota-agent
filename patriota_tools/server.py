@@ -473,9 +473,6 @@ def publish_article_to_cms(article_id: int) -> dict[str, Any]:
         if "error" in gen_result:
             return gen_result
 
-    cluster = db.get_cluster(settings.db_path, article["cluster_id"]) if article.get("cluster_id") else None
-    cluster_topic = (cluster or {}).get("topic", "")
-
     prompt = db.get_latest_prompt(settings.db_path, "editorial")
     prompt_version_id = prompt["id"] if prompt else None
 
@@ -486,7 +483,6 @@ def publish_article_to_cms(article_id: int) -> dict[str, Any]:
         "texto": article.get("body") or "",
         "autor": "El Patriota",
         "volanta": article.get("volanta") or "",
-        "grupo_tema": cluster_topic,
     }
     try:
         result = get_cms(settings).publish_draft(payload)

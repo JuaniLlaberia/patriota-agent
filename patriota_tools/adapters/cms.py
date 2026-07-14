@@ -22,7 +22,6 @@ from ..config import Settings
 
 _HERMES_HOME = Path(os.environ.get("HERMES_HOME", str(Path.home() / ".hermes")))
 _TOKEN_FILE = _HERMES_HOME / "memory" / "cms_tokens.json"
-_SECCIONES_FILE = _HERMES_HOME / "memory" / "cms_secciones.json"
 
 _ACCESS_TTL = 6.5 * 24 * 3600   # renew at 6.5 days (token expires at 7)
 _REFRESH_TTL = 30 * 24 * 3600   # re-login after 30 days
@@ -145,66 +144,15 @@ class RealCMS(CMSClient):
         tokens = self._login()
         return tokens["access_token"]
 
-    # ── Secciones cache ──────────────────────────────────────────────────────
-
-    def _get_secciones(self, token: str) -> list[dict[str, Any]]:
-        try:
-            cached = json.loads(_SECCIONES_FILE.read_text(encoding="utf-8"))
-            if time.time() - cached.get("fetched_at", 0) < 86400:
-                return cached["secciones"]
-        except (FileNotFoundError, json.JSONDecodeError, KeyError):
-            pass
-
-        secciones: list[dict] = []
-        pagina = 1
-        while True:
-            resp = httpx.get(
-                f"{self._base}/secciones",
-                headers={"Authorization": f"Bearer {token}"},
-                params={"pagina": pagina},
-                timeout=30,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            batch = data.get("secciones") or []
-            secciones.extend(batch)
-            paginador = data.get("paginador", {})
-            if pagina >= paginador.get("paginas", 1):
-                break
-            pagina += 1
-
-        _SECCIONES_FILE.parent.mkdir(parents=True, exist_ok=True)
-        _SECCIONES_FILE.write_text(
-            json.dumps({"fetched_at": time.time(), "secciones": secciones}, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-        return secciones
-
-    def _map_seccion_id(self, tema: str, secciones: list[dict]) -> int | None:
-        """Heuristic topic → section mapping; case-insensitive keyword match."""
-        tema_lower = tema.lower()
-        keywords: dict[str, list[str]] = {
-            "política": ["política", "gobierno", "milei", "congreso", "senado", "diputados"],
-            "economía": ["economía", "económ", "dólar", "inflación", "banco", "fmi", "retenciones"],
-            "sociedad": ["sociedad", "educación", "salud", "social"],
-            "deportes": ["deporte", "fútbol", "tenis"],
-            "internacionales": ["internacional", "eeuu", "trump", "mundo"],
-        }
-        for seccion in secciones:
-            nombre = seccion.get("nombre", "").lower()
-            for key, kws in keywords.items():
-                if key in nombre and any(kw in tema_lower for kw in kws):
-                    return seccion.get("id")
-        # Fallback: first seccion alphabetically by closest name match
-        return secciones[0]["id"] if secciones else None
-
     # ── Publish ──────────────────────────────────────────────────────────────
 
     def publish_draft(self, payload: dict[str, Any]) -> dict[str, Any]:
-        """POST /noticias as multipart/form-data. Retries once on failure."""
+        """POST /noticias as multipart/form-data. Retries once on failure.
+
+        id_seccion is intentionally omitted: category assignment is left to the
+        human editors in the CMS rather than guessed by the agent.
+        """
         token = self._get_valid_token()
-        secciones = self._get_secciones(token)
-        id_seccion = self._map_seccion_id(payload.get("grupo_tema", ""), secciones)
 
         form: dict[str, Any] = {
             "fecha": payload.get("fecha") or datetime.now(timezone(timedelta(hours=-3))).strftime("%Y-%m-%d %H:%M:%S"),
@@ -216,8 +164,6 @@ class RealCMS(CMSClient):
         for optional in ("bajada", "texto", "volanta"):
             if payload.get(optional):
                 form[optional] = payload[optional]
-        if id_seccion:
-            form["id_seccion"] = str(id_seccion)
 
         headers = {"Authorization": f"Bearer {token}"}
 
