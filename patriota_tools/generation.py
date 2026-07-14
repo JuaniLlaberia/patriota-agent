@@ -2,7 +2,7 @@
 
 Prompt 1 (temperature 0.7): generates a full article draft from source items.
 Prompt 2 (temperature 0.3): re-checks and humanises the draft.
-Both call GPT-4o-mini directly against the OpenAI API (not via OpenRouter) — the
+Both call DEEPSEEK-v4-flash directly against the OpenAI API (not via OpenRouter) — the
 direct API has a dedicated per-org rate limit pool instead of OpenRouter's shared one,
 which is what article generation was hitting.
 """
@@ -21,7 +21,7 @@ from .textclean import clean_article_text
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_MODEL = "gpt-4o-mini"
+_DEFAULT_MODEL = "deepseek-v4-flash"
 
 
 class ArticleGenerator:

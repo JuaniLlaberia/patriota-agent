@@ -10,7 +10,7 @@
 # Opus for drafting quality; routine monitoring cron ticks override to a cheaper
 # model per-job (see hermes/cron/seed-jobs.md). Confirm the exact model string
 # Hermes expects with `hermes config set model anthropic/<model>`.
-model: openai/gpt-4o-mini
+model: deepseek/deepseek-v4-flash
 
 generation:
   temperature: 0.1

@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     twitterapi_io_key: str | None = Field(default=None, alias="TWITTERAPI_IO_KEY")
 
     # OpenAI direct API — embeddings (text-embedding-3-small) and article draft
-    # generation (GPT-4o-mini), both called directly for a dedicated rate-limit pool.
+    # generation (DEEPSEEK-v4-flash), both called directly for a dedicated rate-limit pool.
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     # OpenRouter — clustering's LLM validation step only.
     openrouter_api_key: str | None = Field(default=None, alias="OPENROUTER_API_KEY")

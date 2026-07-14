@@ -164,7 +164,7 @@ write_env_template() {
 # ── LLM provider (pick one) ──────────────────────────────────────────────────
 OPENROUTER_API_KEY=          # required for OpenAI models via OpenRouter
 # ANTHROPIC_API_KEY=         # optional — if switching to an Anthropic model
-# HERMES_MODEL=              # override model (default: openai/gpt-4o-mini)
+# HERMES_MODEL=              # override model (default: deepseek/deepseek-v4-flash)
                               # to change at runtime edit this and restart
 
 # ── Telegram gateway ──────────────────────────────────────────────────────────
@@ -177,7 +177,7 @@ TWITTERAPI_IO_KEY=           # twitterapi.io key for X/Twitter monitoring
 
 # ── AI / LLM ─────────────────────────────────────────────────────────────────
 OPENAI_API_KEY=              # For embeddings (text-embedding-3-small, OpenAI direct)
-OPENROUTER_API_KEY=          # For article generation via GPT-4o-mini (OpenRouter)
+OPENROUTER_API_KEY=          # For article generation via DEEPSEEK-v4-flash (OpenRouter)
 
 # ── CMS OAuth v1.1 ───────────────────────────────────────────────────────────
 CMS_API_URL_BASE=            # CMS REST base URL (e.g. https://api.elpatriota.com)

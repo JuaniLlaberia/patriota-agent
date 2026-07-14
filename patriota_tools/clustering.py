@@ -81,7 +81,7 @@ class HybridClusterer:
         self,
         openai_api_key: str,
         openrouter_api_key: str,
-        llm_model: str = "openai/gpt-4o-mini",
+        llm_model: str = "deepseek/deepseek-v4-flash",
     ) -> None:
         self._embed_client = openai.OpenAI(api_key=openai_api_key)
         self._llm_client = openai.OpenAI(

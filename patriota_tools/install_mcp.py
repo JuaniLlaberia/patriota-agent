@@ -60,7 +60,7 @@ def main() -> None:
     if model_override:
         data["model"] = model_override
     else:
-        data.setdefault("model", "openai/gpt-4o-mini")
+        data.setdefault("model", "deepseek/deepseek-v4-flash")
     data.setdefault("agent", {})["tool_use_enforcement"] = True
     data.setdefault("generation", {}).setdefault("temperature", 0.1)
 
