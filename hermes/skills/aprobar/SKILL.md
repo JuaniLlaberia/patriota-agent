@@ -38,7 +38,9 @@ hagas desde acá aunque el editor lo pida en el mismo mensaje; avisá que use `/
    - `summary_proposed` → avisá "Artículo #[ID] ya tiene resumen — usá /publicar [ID] para generar el borrador y publicar" y saltealo. **No llames a ninguna otra herramienta para este artículo.**
    - `summary_approved`, `published`, `rejected`, `expired` → avisá "Artículo #[ID] ya está en [status], no requiere aprobación" y saltealo.
 3. Cargá el prompt: `mcp_patriota_fetch_prompt("filtering")`.
-4. Cargá las fuentes: `mcp_patriota_get_cluster(cluster_id)`.
+4. Cargá las fuentes: `mcp_patriota_get_article_sources(article_id)`. No uses el `cluster_id`
+   de otro artículo que estés procesando en el mismo lote — pedile las fuentes siempre por
+   este `article_id` puntual.
 5. Redactá el ángulo editorial (2-3 oraciones) y listá las fuentes.
 6. Guardá el resumen Y avanzá el estado en una sola llamada:
    `mcp_patriota_update_article(article_id, summary=resumen_redactado, status="summary_proposed")`.

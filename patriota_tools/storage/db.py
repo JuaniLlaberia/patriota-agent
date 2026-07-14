@@ -267,6 +267,45 @@ def get_article(db_path: str, article_id: int) -> dict[str, Any] | None:
         return dict(row) if row else None
 
 
+def get_article_sources(db_path: str, article_id: int) -> dict[str, Any] | None:
+    """Resolve an article to the exact source items used to generate it.
+
+    Walks article -> cluster -> cluster_items -> source_items, the same path
+    _generate_draft reads from. This is the single source of truth for "what did
+    we actually cite" — callers should use this instead of recalling which items
+    were shown earlier in a conversation.
+    """
+    with get_conn(db_path) as conn:
+        article = conn.execute(
+            "SELECT id, cluster_id, title FROM articles WHERE id = ?", (article_id,)
+        ).fetchone()
+        if not article:
+            return None
+        article = dict(article)
+        if not article["cluster_id"]:
+            return {
+                "article_id": article_id,
+                "cluster_id": None,
+                "topic": None,
+                "sources": [],
+            }
+        cluster = conn.execute(
+            "SELECT id, topic FROM clusters WHERE id = ?", (article["cluster_id"],)
+        ).fetchone()
+        items = conn.execute(
+            """SELECT si.* FROM source_items si
+               JOIN cluster_items ci ON ci.item_id = si.id
+               WHERE ci.cluster_id = ?""",
+            (article["cluster_id"],),
+        )
+        return {
+            "article_id": article_id,
+            "cluster_id": article["cluster_id"],
+            "topic": dict(cluster)["topic"] if cluster else None,
+            "sources": _rows(items),
+        }
+
+
 def list_articles(db_path: str, status: str | None = None) -> list[dict[str, Any]]:
     q = "SELECT * FROM articles"
     params: list[Any] = []

@@ -101,7 +101,10 @@ borran — quedan registrados. No los re-propongas ni los proceses.
 
 Para cada artículo cuyo título fue aprobado (venía de `title_proposed`):
 
-1. Traé las fuentes: `mcp_patriota_get_cluster(cluster_id)`.
+1. Traé las fuentes: `mcp_patriota_get_article_sources(article_id)` (o
+   `mcp_patriota_get_articles_sources([...])` si son varios). Nunca uses el `cluster_id`
+   que recordás de un paso anterior — pedile las fuentes siempre por `article_id` para
+   evitar mezclar fuentes entre artículos.
 2. Redactá el resumen del enfoque editorial según el prompt `filtering`.
 3. Guardá el resumen Y avanzá el estado en una sola llamada:
    `mcp_patriota_update_article(article_id, summary=resumen_redactado, status="summary_proposed")`.
@@ -164,5 +167,7 @@ Confirmá al grupo con el título, la bajada y el `cms_id` devueltos.
 - Registrá los mensajes relevantes del editor con `mcp_patriota_log_editor`.
 - Si el editor rechaza algo, usá `status="rejected"` y explicá brevemente.
 - Nunca inventes fuentes ni datos: usá solo lo que viene en los ítems del cluster.
+- Si en cualquier momento un editor pregunta qué fuentes se usaron para un artículo,
+  consultá `mcp_patriota_get_article_sources(article_id)` — no respondas de memoria.
 - Nunca publiques al CMS sin `/publicar` explícito del editor.
 - El `/estado` muestra `mcp_patriota_list_articles()` + `mcp_patriota_list_clusters()` en formato resumido.

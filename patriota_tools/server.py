@@ -380,6 +380,25 @@ def get_article(article_id: int) -> dict[str, Any]:
 
 
 @mcp.tool()
+def get_article_sources(article_id: int) -> dict[str, Any]:
+    """The exact source items (tweets/articles) used to write an article's draft.
+
+    Resolves article -> cluster -> cluster_items -> source_items directly in the DB —
+    the same path the generation pipeline reads from. Always use this to answer
+    "what sources back article N" instead of recalling the cluster_id from earlier
+    in the conversation; that's how sources get cross-wired between articles.
+    """
+    result = db.get_article_sources(settings.db_path, article_id)
+    return result or {"error": f"artículo {article_id} no existe"}
+
+
+@mcp.tool()
+def get_articles_sources(article_ids: list[int]) -> dict[str, Any]:
+    """Batch get_article_sources — sources for several articles at once, keyed by article_id."""
+    return {str(aid): get_article_sources(aid) for aid in article_ids}
+
+
+@mcp.tool()
 def list_articles(status: str | None = None) -> list[dict[str, Any]]:
     """List articles, optionally by status."""
     return db.list_articles(settings.db_path, status=status)
