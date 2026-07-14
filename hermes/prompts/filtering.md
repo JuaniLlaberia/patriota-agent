@@ -29,13 +29,22 @@ Para que un cluster sea editorial, debe cumplir AL MENOS UNO de estos criterios:
 
 - **Política nacional**: Casa Rosada, Congreso, Justicia, gobernaciones, partidos políticos.
 - **Economía argentina**: tipo de cambio, inflación, presupuesto, BCRA, FMI, deuda externa,
-  exportaciones agropecuarias, energía.
+  exportaciones agropecuarias, energía, privatizaciones, inversiones, minería, agro, mercado
+  inmobiliario (particularmente CABA) y mercado bursátil — siempre que haya impacto concreto
+  en los negocios o la economía argentina.
 - **Sociedad**: temas que afectan la vida cotidiana (salud, educación, seguridad, trabajo).
-- **Deportes**: fútbol argentino (AFA, Primera División, Copa Libertadores con clubes argentinos),
-  selección nacional en cualquier deporte, atletas argentinos en competencias internacionales
-  (Fórmula 1, tenis, básquet, rugby, etc.).
+- **Deportes**: fútbol argentino (AFA, Primera División, Copa Libertadores con clubes
+  argentinos), con especial atención a los clubes grandes (Boca, River, Rosario Central,
+  Estudiantes, Independiente, Racing, San Lorenzo, Vélez) — sus finales o avances a instancias
+  importantes de campeonatos internacionales (Copa Libertadores, Copa Sudamericana); selección
+  nacional en cualquier deporte, incluida la cobertura de Mundiales (principalmente la Selección
+  Argentina, pero también los demás seleccionados importantes); atletas argentinos en
+  competencias internacionales (Fórmula 1, tenis, básquet, rugby, etc.).
 - **Cultura y entretenimiento argentino**: cine, música, teatro, figuras culturales del país.
-- **Internacional relevante**: hechos con impacto probado y concreto en Argentina.
+- **Internacional relevante**: hechos con impacto probado y concreto en Argentina, en particular
+  relaciones con EE.UU., FMI, Brasil, Israel, España, Italia, China, Reino Unido, Chile y la
+  Unión Europea; sanciones, acuerdos y declaraciones de funcionarios extranjeros con efecto
+  verificable sobre Argentina.
 
 ## Exclusiones
 
@@ -43,7 +52,8 @@ Descartar sin proponer nota cuando:
 
 - Es política interna de un país extranjero sin conexión con Argentina.
 - Es deportes o entretenimiento extranjero donde no participa ningún argentino ni afecta
-  a ningún club o institución argentina.
+  a ningún club o institución argentina, salvo cobertura de Mundiales de selecciones
+  importantes (más allá de la Selección Argentina).
 - Es una noticia local de otro país sin efecto en Argentina.
 - El único nexo con Argentina es especulativo ("podría afectar"); el impacto debe ser
   concreto y verificable en las fuentes del cluster.
