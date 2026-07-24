@@ -30,15 +30,26 @@ db.init_db(settings.db_path)
 
 
 def _seed_prompts() -> None:
-    """Seed the 3 editable prompts from hermes/prompts/*.md if none exist yet."""
+    """Seed the editable prompts from hermes/prompts/*.md, keeping the DB in sync
+    with repo changes until an editor customizes a prompt via Telegram.
+
+    - No version yet → seed it (editor='seed').
+    - Latest version is still editor='seed' and the repo file changed → seed a new
+      version, so `git pull` + reinstall actually updates production prompts.
+    - Latest version was authored by an editor (any other 'editor' value) → never
+      touch it; their edit always wins over the repo default.
+    """
     for name in ("editorial", "filtering", "twitter", "recheck", "working_hours"):
-        if db.get_latest_prompt(settings.db_path, name):
-            continue
         path = settings.prompts / f"{name}.md"
-        if path.exists():
-            db.add_prompt_version(
-                settings.db_path, name, path.read_text(encoding="utf-8"), editor="seed"
-            )
+        if not path.exists():
+            continue
+        file_content = path.read_text(encoding="utf-8")
+
+        latest = db.get_latest_prompt(settings.db_path, name)
+        if latest is None:
+            db.add_prompt_version(settings.db_path, name, file_content, editor="seed")
+        elif latest.get("editor") == "seed" and latest.get("content") != file_content:
+            db.add_prompt_version(settings.db_path, name, file_content, editor="seed")
 
 
 _seed_prompts()
@@ -239,14 +250,15 @@ def search_twitter(
 async def ingest_media(outlet_id: str | None = None) -> dict[str, Any]:
     """Scrape one outlet (by id) or all outlets; store new (deduped) articles.
 
-    Scraping runs in a thread to avoid blocking the event loop. Items are written
-    to DB via the ingest queue (sequential, no lock contention).
+    Scraping runs concurrently (one thread per outlet, each bounded by the scraper's
+    own HTTP timeout) so a single stalled outlet costs seconds, not the whole call.
+    Items are written to DB via the ingest queue (sequential, no lock contention).
     """
     outlet_ids = [outlet_id] if outlet_id else list(OUTLETS.keys())
-    all_items: list[dict[str, Any]] = []
-    for oid in outlet_ids:
-        items = await asyncio.to_thread(scrape_outlet, settings, oid)
-        all_items.extend(items)
+    results = await asyncio.gather(
+        *(asyncio.to_thread(scrape_outlet, settings, oid) for oid in outlet_ids)
+    )
+    all_items: list[dict[str, Any]] = [item for items in results for item in items]
 
     await _ensure_writer()
     for it in all_items:
@@ -287,7 +299,13 @@ def create_cluster(topic: str, item_ids: list[int]) -> dict[str, Any]:
 
 @mcp.tool()
 def list_clusters(status: str | None = None) -> list[dict[str, Any]]:
-    """List clusters, optionally by status (proposed|approved|rejected)."""
+    """List clusters, optionally by status (proposed|titled|approved|rejected|expired).
+
+    'proposed' clusters have no article yet. 'titled' is set automatically by
+    create_article the moment a title is proposed for a cluster — a cluster never
+    goes back to 'proposed' after that, regardless of what happens to its article
+    (approved, discarded, or expired), so the same story is never re-proposed.
+    """
     return db.list_clusters(settings.db_path, status=status)
 
 
@@ -300,7 +318,7 @@ def get_cluster(cluster_id: int) -> dict[str, Any]:
 
 @mcp.tool()
 def set_cluster_status(cluster_id: int, status: str) -> dict[str, Any]:
-    """Set a cluster status (proposed|approved|rejected)."""
+    """Set a cluster status (proposed|titled|approved|rejected|expired)."""
     db.set_cluster_status(settings.db_path, cluster_id, status)
     return {"ok": True, "cluster_id": cluster_id, "status": status}
 
@@ -436,7 +454,7 @@ def _generate_draft(article: dict[str, Any]) -> dict[str, Any]:
     # Pass the approved title as a hard constraint for the LLM.
     full_prompt = f"TÍTULO APROBADO (usalo exactamente): {article['title']}\n\n{editorial_prompt}"
 
-    generator = ArticleGenerator(settings.openai_api_key)
+    generator = ArticleGenerator(settings.openrouter_api_key)
     generated = generator.generate(items, full_prompt, recheck_prompt)
 
     db.update_article(
@@ -466,7 +484,7 @@ def publish_article_to_cms(article_id: int) -> dict[str, Any]:
 
     Retry-safe: if a previous call generated the draft but the CMS post failed, the article
     is left in 'summary_approved' with its body already saved — calling this again skips
-    regeneration and just retries the CMS post. Requires OPENAI_API_KEY.
+    regeneration and just retries the CMS post. Requires OPENROUTER_API_KEY.
     """
     article = db.get_article(settings.db_path, article_id)
     if not article:
@@ -486,8 +504,8 @@ def publish_article_to_cms(article_id: int) -> dict[str, Any]:
         article["status"] = "summary_approved"
 
     if not article.get("body"):
-        if not settings.openai_api_key:
-            return {"error": "OPENAI_API_KEY no configurado"}
+        if not settings.openrouter_api_key:
+            return {"error": "OPENROUTER_API_KEY no configurado"}
         gen_result = _generate_draft(article)
         if "error" in gen_result:
             return gen_result

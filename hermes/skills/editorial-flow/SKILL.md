@@ -58,11 +58,12 @@ borran — quedan registrados. No los re-propongas ni los proceses.
 ## Paso 2 — Propuesta de títulos
 
 1. Traé todos los clusters y artículos pendientes:
-   - `mcp_patriota_list_clusters(status="proposed")` → todos los clusters esperando título.
+   - `mcp_patriota_list_clusters(status="proposed")` → clusters esperando título (un cluster
+     sale de `proposed` en cuanto se le crea un artículo, así que esta lista nunca incluye
+     temas ya titulados, descartados o expirados — no hace falta cruzarla con nada).
    - `mcp_patriota_list_articles(status="title_proposed")` → artículos que ya tienen título propuesto.
-   - Identificá los `cluster_id` que ya tienen artículo en `title_proposed`; esos no necesitan título nuevo pero sí aparecen en la lista final.
 
-2. Para cada cluster SIN artículo propuesto, redactá un título candidato con la voz de El Patriota
+2. Para cada cluster de la lista, redactá un título candidato con la voz de El Patriota
    (prompt `editorial`). Verificá antes de registrar:
    - ¿Nombra al actor principal (persona u organismo concreto)?
    - ¿Describe una acción específica ocurrida ahora?

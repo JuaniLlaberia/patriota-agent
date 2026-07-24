@@ -243,6 +243,13 @@ def create_article(db_path: str, title: str, cluster_id: int | None = None) -> i
                VALUES (?, ?, 'title_proposed', ?, ?)""",
             (cluster_id, title, _now(), _now()),
         )
+        # A cluster that has ever had a title proposed must never again show up as
+        # 'proposed' — otherwise a discarded/expired article's cluster looks "untitled"
+        # again and the next cycle re-proposes the same story forever.
+        if cluster_id is not None:
+            conn.execute(
+                "UPDATE clusters SET status = 'titled' WHERE id = ?", (cluster_id,)
+            )
         return int(cur.lastrowid)
 
 
@@ -324,20 +331,30 @@ def expire_stale_articles(db_path: str, max_age_hours: int) -> list[int]:
     editor already engaged with. Rows are kept (status change only, no delete) for
     traceability. Returns the ids that were expired. created_at is stored as UTC ISO,
     so a lexicographic comparison against a same-format cutoff is correct.
+
+    Also marks the parent clusters 'expired' (they're already 'titled' since
+    create_article, so this is traceability only — it doesn't change what the
+    editorial-flow skill sees as pending).
     """
     cutoff = (datetime.now(timezone.utc) - timedelta(hours=max_age_hours)).isoformat()
     with get_conn(db_path) as conn:
-        ids = [
-            int(r["id"]) for r in conn.execute(
-                "SELECT id FROM articles WHERE status = 'title_proposed' AND created_at < ?",
-                (cutoff,),
-            )
-        ]
+        rows = conn.execute(
+            "SELECT id, cluster_id FROM articles WHERE status = 'title_proposed' AND created_at < ?",
+            (cutoff,),
+        ).fetchall()
+        ids = [int(r["id"]) for r in rows]
+        cluster_ids = [int(r["cluster_id"]) for r in rows if r["cluster_id"] is not None]
         if ids:
             conn.execute(
                 "UPDATE articles SET status = 'expired', updated_at = ? "
                 "WHERE status = 'title_proposed' AND created_at < ?",
                 (_now(), cutoff),
+            )
+        if cluster_ids:
+            placeholders = ",".join("?" * len(cluster_ids))
+            conn.execute(
+                f"UPDATE clusters SET status = 'expired' WHERE id IN ({placeholders})",
+                cluster_ids,
             )
         return ids
 

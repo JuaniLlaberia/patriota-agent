@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import Any
 
+import httpx
 from pydantic import BaseModel
 
 from ..textclean import clean_article_text
@@ -63,14 +64,23 @@ class RSSFeedScraper(Scraper):
     def scrape(self) -> list[dict[str, Any]]:
         import feedparser  # lazy import so mock mode never needs it
 
+        # feedparser.parse(url) downloads via urllib with NO socket timeout — a single
+        # stalled outlet would hang the whole ingest_media call until the 600s MCP
+        # timeout killed it. Fetch with an explicit httpx timeout instead and hand
+        # feedparser the bytes to parse.
         try:
-            feed = feedparser.parse(
+            resp = httpx.get(
                 self.feed_url,
-                agent="patriota-tools/0.1 (news monitor)",
+                timeout=20.0,
+                follow_redirects=True,
+                headers={"User-Agent": "patriota-tools/0.1 (news monitor)"},
             )
+            resp.raise_for_status()
         except Exception as exc:
             logger.warning("RSS fetch failed for %s: %s", self.outlet_id, exc)
             return []
+
+        feed = feedparser.parse(resp.content)
 
         articles = []
         for entry in feed.entries:

@@ -2,9 +2,8 @@
 
 Prompt 1 (temperature 0.7): generates a full article draft from source items.
 Prompt 2 (temperature 0.3): re-checks and humanises the draft.
-Both call DEEPSEEK-v4-flash directly against the OpenAI API (not via OpenRouter) — the
-direct API has a dedicated per-org rate limit pool instead of OpenRouter's shared one,
-which is what article generation was hitting.
+Both call deepseek/deepseek-v4-flash via OpenRouter — OpenAI doesn't serve DeepSeek
+models, so this must go through OpenRouter (same as clustering's LLM validation step).
 """
 
 from __future__ import annotations
@@ -21,14 +20,16 @@ from .textclean import clean_article_text
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_MODEL = "deepseek-v4-flash"
+_DEFAULT_MODEL = "deepseek/deepseek-v4-flash"
 
 
 class ArticleGenerator:
     """Generate article drafts via the two-prompt pipeline."""
 
-    def __init__(self, openai_api_key: str, model: str = _DEFAULT_MODEL) -> None:
-        self._client = openai.OpenAI(api_key=openai_api_key)
+    def __init__(self, openrouter_api_key: str, model: str = _DEFAULT_MODEL) -> None:
+        self._client = openai.OpenAI(
+            api_key=openrouter_api_key, base_url="https://openrouter.ai/api/v1"
+        )
         self._model = model
 
     # ── Source context builder ───────────────────────────────────────────────

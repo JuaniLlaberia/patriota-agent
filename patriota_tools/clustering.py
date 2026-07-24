@@ -132,9 +132,14 @@ class HybridClusterer:
             pass
         engagement = raw.get("likeCount") or raw.get("likes") or ""
         eng_str = f" | engagement: {engagement}" if engagement else ""
+        # Tweets have no title — item['body'] is the tweet text and is the only content
+        # the validator sees for them. Without it every tweet renders as "(sin título)"
+        # with zero information, so the LLM validates them blind.
+        texto = (item.get("body") or "")[:280]
         return (
             f"- id: {item['id']}\n"
             f"  titulo: {item.get('title') or '(sin título)'}\n"
+            f"  texto: {texto}\n"
             f"  fuente: {item.get('source') or ''}\n"
             f"  url: {item.get('url') or ''}\n"
             f"  fecha: {item.get('published_at') or item.get('ingested_at') or ''}"
