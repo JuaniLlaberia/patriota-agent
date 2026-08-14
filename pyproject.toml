@@ -11,6 +11,9 @@ dependencies = [
     "pyyaml>=6.0",
     "beautifulsoup4>=4.12",
     "feedparser>=6.0",
+    "openai>=1.30",
+    "hdbscan>=0.8.38",
+    "numpy>=1.26",
 ]
 
 [project.optional-dependencies]

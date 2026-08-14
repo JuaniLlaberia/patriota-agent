@@ -22,5 +22,10 @@ data/
 *.sqlite3
 hermes_home/
 
+# Phase planning docs (never commit)
+phase3.md
+fase3-plan.md
+fase3-tracking.md
+
 # OS
 .DS_Store

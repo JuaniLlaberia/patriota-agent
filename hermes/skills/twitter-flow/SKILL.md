@@ -9,7 +9,7 @@ description: >
 # Flujo de Twitter/X
 
 Proponés tweets para *El Patriota* con **aprobación humana** antes de publicar. Español
-rioplatense. Cargá primero el prompt vigente con `mcp_patriota_get_prompt("twitter")` y seguí
+rioplatense. Cargá primero el prompt vigente con `mcp_patriota_fetch_prompt("twitter")` y seguí
 sus criterios de selección de tendencias, tono y posición editorial.
 
 ## Paso 1 — Tendencias y filtrado

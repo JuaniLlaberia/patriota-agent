@@ -7,9 +7,16 @@
 #   1. Creates a system user `patriota` to run the service.
 #   2. Installs the Hermes CLI for that user.
 #   3. Creates a Python venv at /opt/patriota/venv and installs patriota-tools.
-#   4. Copies config, persona, skills, and prompts to the Hermes home directory.
-#   5. Writes a secrets template to /etc/patriota/env (fill in before starting).
-#   6. Installs and enables the systemd service.
+#   4. Copies config, persona, skills, and prompts to both the Hermes home and
+#      a root-owned canonical location (/opt/patriota/skills/) that start-gateway.sh
+#      uses to reset skills on every start (prevents self-improvement drift).
+#   5. Initializes the DB and its tables if they do not exist (idempotent).
+#   6. Removes the cron sentinel so updated job definitions are re-seeded on next start.
+#   7. Writes a secrets template to /etc/patriota/env (fill in before starting).
+#   8. Installs and enables the systemd service.
+#   9. Installs a health-check cron that alerts Telegram on service/credit failures.
+#
+# This script never wipes DB data or agent memory — run wipe-agent.sh first for that.
 #
 # Usage:
 #   sudo bash deploy/install.sh
@@ -24,8 +31,8 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # ── 0. System prerequisites ───────────────────────────────────────────────────
 install_prerequisites() {
     info "Installing system prerequisites..."
-    apt-get install -y -q python3-venv ripgrep ffmpeg
-    check "python3-venv, ripgrep, ffmpeg installed"
+    apt-get install -y -q python3-venv ripgrep ffmpeg sqlite3
+    check "python3-venv, ripgrep, ffmpeg, sqlite3 installed"
 }
 INSTALL_USER="patriota"
 HERMES_HOME="/home/$INSTALL_USER/.hermes"
@@ -75,16 +82,15 @@ install_hermes() {
 
 # ── 3. Python venv + patriota-tools ──────────────────────────────────────────
 install_tools() {
-    info "Installing patriota-tools into $VENV_DIR..."
-    if [ -x "$VENV_DIR/bin/patriota-tools" ]; then
-        check "patriota-tools already installed (skipping)"
-        return
+    info "Installing/updating patriota-tools into $VENV_DIR..."
+    if [ ! -d "$VENV_DIR" ]; then
+        python3 -m venv "$VENV_DIR"
+        "$VENV_DIR/bin/pip" install --quiet --upgrade pip
     fi
-    python3 -m venv "$VENV_DIR"
-    "$VENV_DIR/bin/pip" install --quiet --upgrade pip
-    "$VENV_DIR/bin/pip" install --quiet "$REPO_DIR"
+    # Always force-reinstall so code changes in the repo are picked up on every deploy.
+    "$VENV_DIR/bin/pip" install --quiet --force-reinstall "$REPO_DIR"
     chown -R root:root "$VENV_DIR"   # root-owned, world-readable
-    check "patriota-tools installed"
+    check "patriota-tools installed/updated"
 }
 
 # ── 4. Static assets (prompts, sources, skills, persona) ─────────────────────
@@ -98,6 +104,15 @@ copy_assets() {
     cp "$REPO_DIR/config/sources.yaml"  "$STATIC_DIR/config/"
     check "start-gateway.sh, prompts, and sources copied to $STATIC_DIR"
 
+    # Canonical skills: root-owned, world-readable, NOT writable by patriota.
+    # start-gateway.sh copies from here to ~/.hermes/skills/ on every start,
+    # reverting any self-improvement patches and removing agent-created skills.
+    install -d -m 755 "$STATIC_DIR/skills"
+    cp -r "$REPO_DIR/hermes/skills/." "$STATIC_DIR/skills/"
+    find "$STATIC_DIR/skills" -type f -exec chmod 644 {} \;
+    find "$STATIC_DIR/skills" -type d -exec chmod 755 {} \;
+    check "canonical skills saved to $STATIC_DIR/skills (root-owned)"
+
     # Hermes home: owned by patriota (Hermes writes memory/sessions/cron here)
     su -l "$INSTALL_USER" -c "mkdir -p $HERMES_HOME/skills"
     install -o "$INSTALL_USER" -m 644 \
@@ -109,27 +124,47 @@ copy_assets() {
     check "AGENTS.md, config.yaml, and skills copied to $HERMES_HOME"
 }
 
+# ── 4b. Initialize DB ────────────────────────────────────────────────────────
+init_db() {
+    info "Initializing editorial DB (skipped if already up to date)..."
+    DB_PATH="$HERMES_HOME/patriota.db"
+    # init_db uses CREATE TABLE IF NOT EXISTS and runs migrations idempotently,
+    # so this is safe to call on every deploy — it only creates what is missing.
+    PATRIOTA_DB_PATH="$DB_PATH" "$VENV_DIR/bin/python" -c \
+        "from patriota_tools.storage import db; db.init_db('$DB_PATH')"
+    chown "$INSTALL_USER" "$DB_PATH"
+    check "DB ready at $DB_PATH"
+}
+
+# ── 4c. Reset cron sentinel ───────────────────────────────────────────────────
+reset_state() {
+    info "Resetting cron sentinel for fresh deploy..."
+
+    # Remove sentinel so start-gateway.sh re-creates cron jobs with updated
+    # definitions from code on next start. DB and agent memory are never touched
+    # here — use wipe-agent.sh for a full factory reset.
+    rm -f "$HERMES_HOME/.cron-seeded"
+    check "cron sentinel removed (jobs re-seed on next start)"
+}
+
 # ── 5. Env file template ──────────────────────────────────────────────────────
 write_env_template() {
-    info "Writing env template to $ENV_FILE..."
+    info "Writing env file to $ENV_FILE..."
     mkdir -p /etc/patriota
-
-    if [ -f "$ENV_FILE" ]; then
-        warn "$ENV_FILE already exists — not overwriting"
-        return
-    fi
 
     # Resolve hermes binary path for PATH in service
     HERMES_BIN_DIR="$(dirname "$(su -l "$INSTALL_USER" -c "command -v hermes")")"
 
-    cat > "$ENV_FILE" << EOF
+    if [ ! -f "$ENV_FILE" ]; then
+        # Fresh install — write the full template including secrets placeholders
+        cat > "$ENV_FILE" << EOF
 # /etc/patriota/env — El Patriota gateway secrets.
 # Fill in all required values, then: sudo systemctl start patriota-gateway
 
 # ── LLM provider (pick one) ──────────────────────────────────────────────────
 OPENROUTER_API_KEY=          # required for OpenAI models via OpenRouter
 # ANTHROPIC_API_KEY=         # optional — if switching to an Anthropic model
-# HERMES_MODEL=              # override model (default: openai/gpt-4o-mini)
+# HERMES_MODEL=              # override model (default: deepseek/deepseek-v4-flash)
                               # to change at runtime edit this and restart
 
 # ── Telegram gateway ──────────────────────────────────────────────────────────
@@ -139,8 +174,17 @@ TELEGRAM_ALLOWED_USERS=      # your Telegram user id (e.g. 123456789)
 
 # ── External integrations ─────────────────────────────────────────────────────
 TWITTERAPI_IO_KEY=           # twitterapi.io key for X/Twitter monitoring
-CMS_BASE_URL=                # CMS REST endpoint
-CMS_API_TOKEN=               # CMS API token
+
+# ── AI / LLM ─────────────────────────────────────────────────────────────────
+OPENAI_API_KEY=              # For embeddings (text-embedding-3-small, OpenAI direct)
+OPENROUTER_API_KEY=          # For article generation via DEEPSEEK-v4-flash (OpenRouter)
+
+# ── CMS OAuth v1.1 ───────────────────────────────────────────────────────────
+CMS_API_URL_BASE=            # CMS REST base URL (e.g. https://api.elpatriota.com)
+CMS_CLIENT_ID=               # OAuth client ID
+CMS_CLIENT_SECRET=           # OAuth client secret
+CMS_USERNAME=                # CMS user with API permissions
+CMS_PASSWORD=                # CMS user password
 
 # ── Resolved by install.sh — do not edit unless you move things ──────────────
 HERMES_HOME=$HERMES_HOME
@@ -152,9 +196,31 @@ PATRIOTA_DB_PATH=$HERMES_HOME/patriota.db
 PATRIOTA_PROMPTS_DIR=$STATIC_DIR/prompts
 USE_MOCKS=false
 EOF
-    chmod 640 "$ENV_FILE"
-    chown root:"$INSTALL_USER" "$ENV_FILE"
-    check "$ENV_FILE written — fill in secrets before starting the service"
+        chmod 640 "$ENV_FILE"
+        chown root:"$INSTALL_USER" "$ENV_FILE"
+        check "$ENV_FILE written — fill in secrets before starting the service"
+    else
+        # Re-deploy — secrets are preserved; only update/add the resolved vars
+        # (paths computed by install.sh that may change between deploys).
+        warn "$ENV_FILE already exists — preserving secrets, updating resolved vars"
+        _upsert_env() {
+            local key="$1" val="$2"
+            if grep -q "^${key}=" "$ENV_FILE"; then
+                sed -i "s|^${key}=.*|${key}=${val}|" "$ENV_FILE"
+            else
+                echo "${key}=${val}" >> "$ENV_FILE"
+            fi
+        }
+        _upsert_env "HERMES_HOME"           "$HERMES_HOME"
+        _upsert_env "HERMES_WORKDIR"        "$HERMES_HOME"
+        _upsert_env "PATH"                  "$HERMES_BIN_DIR:/usr/local/bin:/usr/bin:/bin"
+        _upsert_env "PATRIOTA_INSTALL_MCP"  "$VENV_DIR/bin/patriota-install-mcp"
+        _upsert_env "PATRIOTA_MCP_COMMAND"  "$VENV_DIR/bin/patriota-tools"
+        _upsert_env "PATRIOTA_DB_PATH"      "$HERMES_HOME/patriota.db"
+        _upsert_env "PATRIOTA_PROMPTS_DIR"  "$STATIC_DIR/prompts"
+        _upsert_env "USE_MOCKS"             "false"
+        check "resolved vars updated in $ENV_FILE"
+    fi
 }
 
 # ── 6. systemd service ────────────────────────────────────────────────────────
@@ -166,6 +232,18 @@ install_service() {
     check "service installed and enabled (not started yet)"
 }
 
+# ── 7. Health check cron ──────────────────────────────────────────────────────
+install_health_check() {
+    info "Installing health check..."
+    install -m 755 "$REPO_DIR/deploy/health-check.sh" "$STATIC_DIR/health-check.sh"
+    cat > "/etc/cron.d/patriota-health" << 'CRONEOF'
+# El Patriota — service health check (every 15 min)
+*/15 * * * * root /opt/patriota/health-check.sh >> /var/log/patriota-health.log 2>&1
+CRONEOF
+    chmod 644 "/etc/cron.d/patriota-health"
+    check "health check installed at /etc/cron.d/patriota-health (every 15 min)"
+}
+
 # ── main ──────────────────────────────────────────────────────────────────────
 require_root
 install_prerequisites
@@ -173,8 +251,11 @@ create_user
 install_hermes
 install_tools
 copy_assets
+init_db
+reset_state
 write_env_template
 install_service
+install_health_check
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

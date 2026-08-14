@@ -10,13 +10,27 @@
 # Opus for drafting quality; routine monitoring cron ticks override to a cheaper
 # model per-job (see hermes/cron/seed-jobs.md). Confirm the exact model string
 # Hermes expects with `hermes config set model anthropic/<model>`.
-model: openai/gpt-4o-mini
+model: deepseek/deepseek-v4-flash
 
 generation:
   temperature: 0.1
+  max_tokens: 4096    # cap completion budget; routine calls never need 16 K
+
+# MCP per-tool-call timeout is set by install_mcp.py via PATRIOTA_MCP_TIMEOUT (default 600s).
+# Do NOT set mcp_call_timeout_s here — install_mcp.py overwrites mcp_servers on every start.
 
 memory_enabled: true
 user_profile_enabled: true
+
+# ── Session freshness ──────────────────────────────────────────────────────────
+# Reset the gateway conversation once a day so accumulated context (stale article
+# ID lists) doesn't build up and confuse the model. at_hour is LOCAL server time;
+# the VPS runs America/Argentina/Buenos_Aires, so 4 = 04:00 ART (editorial dead
+# window). Persistent memory and the editorial DB are preserved across a reset;
+# only the conversation transcript is cleared.
+session_reset:
+  mode: daily
+  at_hour: 4
 
 agent:
   tool_use_enforcement: true   # force structured tool calls on GPT models (not needed for Anthropic)
@@ -35,12 +49,12 @@ mcp_servers:
       USE_MOCKS: "false"
       PATRIOTA_DB_PATH: "/home/patriota/.hermes/patriota.db"
       PATRIOTA_WOEID: "455827"
-      # TWITTERAPI_IO_KEY, CMS_BASE_URL, CMS_API_TOKEN injected from /etc/patriota/env
+      # TWITTERAPI_IO_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY, CMS_* injected from /etc/patriota/env
 
 # ── Cron ───────────────────────────────────────────────────────────────────────
 cron:
   wrap_response: false
-  script_timeout_seconds: 300
+  script_timeout_seconds: 900  # ingest + cluster + editorial can take up to 15 min total
 
 # ── Persona / operating rules ──────────────────────────────────────────────────
 # Persistent persona + house rules live in hermes/AGENTS.md, copied to

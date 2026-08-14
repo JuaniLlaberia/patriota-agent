@@ -32,7 +32,16 @@ def main() -> None:
             "PATRIOTA_PROMPTS_DIR", "/opt/patriota/prompts"
         ),
     }
-    for optional in ("TWITTERAPI_IO_KEY", "CMS_BASE_URL", "CMS_API_TOKEN"):
+    for optional in (
+        "TWITTERAPI_IO_KEY",
+        "OPENAI_API_KEY",
+        "OPENROUTER_API_KEY",
+        "CMS_API_URL_BASE",
+        "CMS_CLIENT_ID",
+        "CMS_CLIENT_SECRET",
+        "CMS_USERNAME",
+        "CMS_PASSWORD",
+    ):
         val = os.environ.get(optional)
         if val:
             mcp_env[optional] = val
@@ -43,14 +52,15 @@ def main() -> None:
         ),
         "env": mcp_env,
         "enabled": True,
-        "timeout": int(os.environ.get("PATRIOTA_MCP_TIMEOUT", "300")),
+        "timeout": int(os.environ.get("PATRIOTA_MCP_TIMEOUT", "600")),
+        "connect_timeout": int(os.environ.get("PATRIOTA_MCP_CONNECT_TIMEOUT", "60")),
     }
 
     model_override = os.environ.get("HERMES_MODEL")
     if model_override:
         data["model"] = model_override
     else:
-        data.setdefault("model", "openai/gpt-4o-mini")
+        data.setdefault("model", "deepseek/deepseek-v4-flash")
     data.setdefault("agent", {})["tool_use_enforcement"] = True
     data.setdefault("generation", {}).setdefault("temperature", 0.1)
 

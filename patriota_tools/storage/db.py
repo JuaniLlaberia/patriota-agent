@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS source_items (
     published_at  TEXT,
     dedupe_key    TEXT UNIQUE NOT NULL,
     raw           TEXT,                                -- json
-    status        TEXT NOT NULL DEFAULT 'new',         -- 'new' | 'clustered'
+    status        TEXT NOT NULL DEFAULT 'new',         -- 'new' | 'clustered' | 'solo'
     ingested_at   TEXT NOT NULL
 );
 
@@ -54,9 +54,11 @@ CREATE TABLE IF NOT EXISTS articles (
     cluster_id         INTEGER,
     title              TEXT NOT NULL,
     summary            TEXT,
+    bajada             TEXT,
+    volanta            TEXT,
     body               TEXT,
     status             TEXT NOT NULL DEFAULT 'title_proposed',
-                       -- title_proposed | summary_approved | published | rejected
+                       -- title_proposed | summary_proposed | summary_approved | published | rejected | expired
     cms_id             TEXT,
     prompt_version_id  INTEGER,
     created_at         TEXT NOT NULL,
@@ -101,12 +103,25 @@ def get_conn(db_path: str) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
+    conn.execute("PRAGMA journal_mode = WAL;")   # concurrent readers don't block writers
+    conn.execute("PRAGMA busy_timeout = 5000;")  # wait up to 5s for write lock before error
     return conn
+
+
+_MIGRATIONS = [
+    "ALTER TABLE articles ADD COLUMN bajada TEXT",
+    "ALTER TABLE articles ADD COLUMN volanta TEXT",
+]
 
 
 def init_db(db_path: str) -> None:
     with get_conn(db_path) as conn:
         conn.executescript(SCHEMA)
+        for migration in _MIGRATIONS:
+            try:
+                conn.execute(migration)
+            except sqlite3.OperationalError:
+                pass  # column already exists
 
 
 def _rows(cur: sqlite3.Cursor) -> list[dict[str, Any]]:
@@ -147,6 +162,27 @@ def list_source_items(
     q += " ORDER BY ingested_at DESC LIMIT ?"; params.append(limit)
     with get_conn(db_path) as conn:
         return _rows(conn.execute(q, params))
+
+
+def list_unprocessed_items(db_path: str, limit: int = 500) -> list[dict[str, Any]]:
+    """Items eligible for clustering: status 'new' or 'solo' (leftover from prior cycles)."""
+    with get_conn(db_path) as conn:
+        return _rows(conn.execute(
+            "SELECT * FROM source_items WHERE status IN ('new', 'solo') ORDER BY ingested_at DESC LIMIT ?",
+            (limit,),
+        ))
+
+
+def mark_items_solo(db_path: str, item_ids: list[int]) -> None:
+    """Mark noise items (no cluster found) as 'solo' so they re-enter the next cycle."""
+    if not item_ids:
+        return
+    placeholders = ",".join("?" * len(item_ids))
+    with get_conn(db_path) as conn:
+        conn.execute(
+            f"UPDATE source_items SET status = 'solo' WHERE id IN ({placeholders})",
+            item_ids,
+        )
 
 
 # ── clusters ────────────────────────────────────────────────────────────────────
@@ -207,10 +243,17 @@ def create_article(db_path: str, title: str, cluster_id: int | None = None) -> i
                VALUES (?, ?, 'title_proposed', ?, ?)""",
             (cluster_id, title, _now(), _now()),
         )
+        # A cluster that has ever had a title proposed must never again show up as
+        # 'proposed' — otherwise a discarded/expired article's cluster looks "untitled"
+        # again and the next cycle re-proposes the same story forever.
+        if cluster_id is not None:
+            conn.execute(
+                "UPDATE clusters SET status = 'titled' WHERE id = ?", (cluster_id,)
+            )
         return int(cur.lastrowid)
 
 
-_ARTICLE_FIELDS = {"title", "summary", "body", "status", "cms_id", "prompt_version_id"}
+_ARTICLE_FIELDS = {"title", "summary", "bajada", "volanta", "body", "status", "cms_id", "prompt_version_id"}
 
 
 def update_article(db_path: str, article_id: int, **fields: Any) -> None:
@@ -231,6 +274,45 @@ def get_article(db_path: str, article_id: int) -> dict[str, Any] | None:
         return dict(row) if row else None
 
 
+def get_article_sources(db_path: str, article_id: int) -> dict[str, Any] | None:
+    """Resolve an article to the exact source items used to generate it.
+
+    Walks article -> cluster -> cluster_items -> source_items, the same path
+    _generate_draft reads from. This is the single source of truth for "what did
+    we actually cite" — callers should use this instead of recalling which items
+    were shown earlier in a conversation.
+    """
+    with get_conn(db_path) as conn:
+        article = conn.execute(
+            "SELECT id, cluster_id, title FROM articles WHERE id = ?", (article_id,)
+        ).fetchone()
+        if not article:
+            return None
+        article = dict(article)
+        if not article["cluster_id"]:
+            return {
+                "article_id": article_id,
+                "cluster_id": None,
+                "topic": None,
+                "sources": [],
+            }
+        cluster = conn.execute(
+            "SELECT id, topic FROM clusters WHERE id = ?", (article["cluster_id"],)
+        ).fetchone()
+        items = conn.execute(
+            """SELECT si.* FROM source_items si
+               JOIN cluster_items ci ON ci.item_id = si.id
+               WHERE ci.cluster_id = ?""",
+            (article["cluster_id"],),
+        )
+        return {
+            "article_id": article_id,
+            "cluster_id": article["cluster_id"],
+            "topic": dict(cluster)["topic"] if cluster else None,
+            "sources": _rows(items),
+        }
+
+
 def list_articles(db_path: str, status: str | None = None) -> list[dict[str, Any]]:
     q = "SELECT * FROM articles"
     params: list[Any] = []
@@ -239,6 +321,42 @@ def list_articles(db_path: str, status: str | None = None) -> list[dict[str, Any
     q += " ORDER BY updated_at DESC"
     with get_conn(db_path) as conn:
         return _rows(conn.execute(q, params))
+
+
+def expire_stale_articles(db_path: str, max_age_hours: int) -> list[int]:
+    """Retire proposed titles the editors never acted on.
+
+    Flips articles left in 'title_proposed' for longer than ``max_age_hours`` to the
+    terminal 'expired' status. Only touches 'title_proposed' — never an article the
+    editor already engaged with. Rows are kept (status change only, no delete) for
+    traceability. Returns the ids that were expired. created_at is stored as UTC ISO,
+    so a lexicographic comparison against a same-format cutoff is correct.
+
+    Also marks the parent clusters 'expired' (they're already 'titled' since
+    create_article, so this is traceability only — it doesn't change what the
+    editorial-flow skill sees as pending).
+    """
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=max_age_hours)).isoformat()
+    with get_conn(db_path) as conn:
+        rows = conn.execute(
+            "SELECT id, cluster_id FROM articles WHERE status = 'title_proposed' AND created_at < ?",
+            (cutoff,),
+        ).fetchall()
+        ids = [int(r["id"]) for r in rows]
+        cluster_ids = [int(r["cluster_id"]) for r in rows if r["cluster_id"] is not None]
+        if ids:
+            conn.execute(
+                "UPDATE articles SET status = 'expired', updated_at = ? "
+                "WHERE status = 'title_proposed' AND created_at < ?",
+                (_now(), cutoff),
+            )
+        if cluster_ids:
+            placeholders = ",".join("?" * len(cluster_ids))
+            conn.execute(
+                f"UPDATE clusters SET status = 'expired' WHERE id IN ({placeholders})",
+                cluster_ids,
+            )
+        return ids
 
 
 # ── tweets ──────────────────────────────────────────────────────────────────────

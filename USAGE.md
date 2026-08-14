@@ -95,15 +95,19 @@ su -l patriota -c "hermes chat"
 
 | Variable | Requerida | Descripción |
 |----------|-----------|-------------|
-| `OPENROUTER_API_KEY` | Sí (para GPT) | Acceso a modelos OpenAI vía OpenRouter |
+| `OPENROUTER_API_KEY` | Sí (clustering + generación) | Validación LLM del clustering semántico y generación de borradores (deepseek/deepseek-v4-flash), ambos vía OpenRouter |
 | `ANTHROPIC_API_KEY` | Si usás Claude | API key de Anthropic |
-| `HERMES_MODEL` | No | Override de modelo (default: `openai/gpt-4o-mini`) |
+| `HERMES_MODEL` | No | Override de modelo (default: `deepseek/deepseek-v4-flash`) |
 | `TELEGRAM_BOT_TOKEN` | Sí | Token del bot de @BotFather |
 | `TELEGRAM_HOME_CHANNEL` | Sí | chat_id del grupo editorial (int negativo) |
 | `TELEGRAM_ALLOWED_USERS` | Sí | Tu user id de Telegram (ej. `123456789`) |
 | `TWITTERAPI_IO_KEY` | Para Twitter real | API key de twitterapi.io |
-| `CMS_BASE_URL` | Para publicar | Endpoint REST del CMS |
-| `CMS_API_TOKEN` | Para publicar | Token del CMS |
+| `OPENAI_API_KEY` | Sí (embeddings) | OpenAI directo — text-embedding-3-small para el clustering semántico |
+| `CMS_API_URL_BASE` | Para publicar | URL base del CMS (ej. `https://api.elpatriota.com`) |
+| `CMS_CLIENT_ID` | Para publicar | OAuth client ID del CMS |
+| `CMS_CLIENT_SECRET` | Para publicar | OAuth client secret del CMS |
+| `CMS_USERNAME` | Para publicar | Usuario CMS con permisos de API |
+| `CMS_PASSWORD` | Para publicar | Contraseña del usuario CMS |
 
 Las variables de rutas (`HERMES_HOME`, `PATRIOTA_MCP_COMMAND`, etc.) las escribe
 `deploy/install.sh` automáticamente — no las edites salvo que muevas la instalación.
@@ -116,7 +120,12 @@ Las variables de rutas (`HERMES_HOME`, `PATRIOTA_MCP_COMMAND`, etc.) las escribe
 **sobre [Hermes Agent](https://hermes-agent.nousresearch.com/)** (Nous Research, MIT). Hermes
 aporta el loop, memoria, skills, cron y Telegram; nosotros aportamos las _capacidades de
 dominio_ como un servidor MCP (`patriota-tools`) + skills + cron.
-LLM = OpenAI vía OpenRouter (default: `gpt-4o-mini`; override con `HERMES_MODEL`). Opera en español rioplatense, con `/aprobar` humano antes de publicar.
+LLM del agente = OpenAI vía OpenRouter (default: `deepseek/deepseek-v4-flash`; override con `HERMES_MODEL`).
+La generación de borradores de artículos y la validación LLM del clustering semántico
+llaman ambas a deepseek/deepseek-v4-flash vía OpenRouter; los embeddings del clustering
+(text-embedding-3-small) van directo a OpenAI.
+Opera en español rioplatense, con `/aprobar` (título → resumen) y `/publicar` (resumen →
+borrador + CMS) humanos en cada etapa.
 
 ### ✅ Funciona hoy
 
